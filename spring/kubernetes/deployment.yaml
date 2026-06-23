@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments-app
+  namespace: default
+  labels:
+    app: payments-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payments-app
+  template:
+    metadata:
+      labels:
+        app: payments-app
+      annotations:
+        # -----------------------------------------------------------------
+        # Vault Agent Injector annotations
+        #
+        # These annotations are read by the Vault Agent Injector webhook
+        # when this Pod is created. The injector automatically:
+        #   - Adds a vault-agent-init initContainer to render the secrets
+        #     file before the app container starts
+        #   - Adds a vault-agent sidecar container to keep leases renewed
+        #     and re-render the file when secrets rotate
+        #
+        # No agent.hcl file is required — the injector builds the agent
+        # configuration from these annotations at admission time.
+        # -----------------------------------------------------------------
+
+        # Enable injection for this Pod.
+        vault.hashicorp.com/agent-inject: "true"
+
+        # The Vault role to authenticate as (maps to the Kubernetes auth
+        # role created in vault/setup-k8s.sh).
+        vault.hashicorp.com/role: "payments-app"
+
+        # --- Secret: vault-secrets.properties (credentials only) -----------
+        #
+        # Vault Agent writes ONLY credentials here. All non-secret config
+        # (datasource URL, driver class, JPA settings) lives in the committed
+        # base application.properties inside the image and is never overridden.
+        # Spring Boot merges both files via spring.config.import.
+
+        # Tell the injector to inject a secret rendered to a file named
+        # "vault-secrets.properties" inside /vault/secrets/.
+        vault.hashicorp.com/agent-inject-secret-vault-secrets.properties: "spring/kv/data/payments-app"
+
+        # Consul Template body — credentials only.
+        vault.hashicorp.com/agent-inject-template-vault-secrets.properties: |
+          {{- with secret "spring/kv/data/payments-app" }}
+          custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
+          custom.static-secret.password={{ index .Data.data "custom.static-secret.password" }}
+          {{- end }}
+          {{- with secret "database/creds/payments-app" }}
+          spring.datasource.username={{ .Data.username }}
+          spring.datasource.password={{ .Data.password }}
+          {{- end }}
+
+        # After each successful re-render, call /actuator/refresh so Spring
+        # re-binds @RefreshScope beans without restarting the container.
+        vault.hashicorp.com/agent-inject-command-vault-secrets.properties: >-
+          curl -sf -X POST http://localhost:8080/actuator/refresh || true
+
+        # Revoke the dynamic DB lease when the Pod shuts down, so stale
+        # credentials do not accumulate in PostgreSQL.
+        vault.hashicorp.com/agent-revoke-on-shutdown: "true"
+
+    spec:
+      serviceAccountName: payments-app
+
+      containers:
+        - name: payments-app
+          # Replace with your image reference.
+          # For k3s with a local registry, use the imported image tag.
+          image: payments-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            # Tell Spring Boot where to import the Vault-rendered credentials file.
+            # The base application.properties (baked into the image) provides all
+            # non-secret defaults; this file adds only username and password.
+            # No "optional:" prefix — app fast-fails if the file is absent.
+            - name: SPRING_CONFIG_IMPORT
+              value: "file:/vault/secrets/vault-secrets.properties"
+            # Override the datasource URL for the in-cluster postgres service.
+            # The base application.properties defaults to "postgres:5432" (Docker
+            # Compose service name); in Kubernetes the FQDN is used instead.
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres.default.svc.cluster.local:5432/payments"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
