@@ -23,6 +23,10 @@ vault {
   address = "http://vault:8200"
 }
 
+template_config {
+  static_secret_render_interval = "1m"
+}
+
 # ---------------------------------------------------------------------------
 # Auto-auth: token file method
 #
@@ -56,8 +60,8 @@ auto_auth {
 #               the latest credentials without a container restart
 # ---------------------------------------------------------------------------
 template {
-  source      = "/spring/vault/secrets.ctmpl"
-  destination = "/secrets/vault-secrets.properties"
+  source               = "/spring/vault/secrets.ctmpl"
+  destination          = "/secrets/vault-secrets.properties"
   error_on_missing_key = true
 
   # payments-app must be running before this succeeds. The || true means
