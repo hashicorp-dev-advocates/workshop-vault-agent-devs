@@ -65,8 +65,8 @@ docker-compose.yml        Local tutorial stack (5 services)
                 ▼
 ┌───────────────────────────────┐
 │  payments-app (Spring Boot)   │
-│  StaticSecretConfig           │  @RefreshScope — binds custom.static-secret.*
-│  DataSourceConfig (HikariCP)  │  @RefreshScope — builds DataSource from datasource.*
+│  ExampleClient                │  @Bean @RefreshScope — rebuilt with static KV credentials
+│  DataSource (HikariCP)        │  @Bean @RefreshScope — rebuilt with dynamic DB credentials
 └───────────────────────────────┘
                 ▲
                 │  POST /actuator/refresh  (called by Vault Agent after each render)
@@ -75,7 +75,7 @@ docker-compose.yml        Local tutorial stack (5 services)
 
 **Two-file property split:**
 - `src/main/resources/application.properties` — committed, non-secret config (datasource URL,
-  driver, JPA settings, actuator exposure). This is the base layer.
+  actuator exposure). This is the base layer.
 - `secrets/vault-secrets.properties` — git-ignored, written at runtime by Vault Agent.
   Contains only credentials. Spring merges this on top of the base layer.
 
@@ -128,7 +128,7 @@ curl -X POST http://localhost:8080/payments \
   -d '{"reference":"PAY-001","amount":99.99,"currency":"USD","status":"PENDING"}'
 
 # Show current static KV secret values — use this to observe live-reload
-curl http://localhost:8080/payments/config
+curl http://localhost:8080/payments/secret
 ```
 
 ### Test live secret reload
@@ -146,7 +146,7 @@ vault kv put spring/kv/payments-app \
 # Vault Agent detects the change, re-renders vault-secrets.properties,
 # and calls POST /actuator/refresh automatically.
 # Within a few seconds the new values appear:
-curl http://localhost:8080/payments/config
+curl http://localhost:8080/payments/secret
 ```
 
 ### Inspect the rendered secrets file
@@ -238,7 +238,7 @@ kubectl port-forward svc/payments-app 8080:8080
 
 curl http://localhost:8080/actuator/health
 curl http://localhost:8080/payments
-curl http://localhost:8080/payments/config
+curl http://localhost:8080/payments/secret
 ```
 
 ---
@@ -259,16 +259,11 @@ Database role: `database/roles/payments-app` — grants `SELECT, INSERT, UPDATE,
 ## Spring Boot application structure
 
 ```
-PaymentsAppApplication        Entry point — excludes DataSourceAutoConfiguration
-config/
-  StaticSecretConfig          @ConfigurationProperties(prefix="custom.static-secret") + @RefreshScope
-  DataSourceConfig            @Bean @RefreshScope — builds HikariCP DataSource from datasource.*
-controller/
-  PaymentsController          GET /payments, POST /payments, GET /payments/config
-model/
-  Payment                     JPA entity → public.payments table
-repository/
-  PaymentRepository           JpaRepository<Payment, Long>
+PaymentsAppApplication        Entry point — @Bean @RefreshScope DataSource and ExampleClient
+AppProperties                 @ConfigurationProperties(prefix="custom") — binds static KV credentials
+ExampleClient                 Pretend external client rebuilt on refresh with latest static credentials
+Payment                       Record mapped to the public.payments table
+PaymentsController            GET /payments, POST /payments, GET /payments/secret
 ```
 
 Key properties in `src/main/resources/application.properties`:
