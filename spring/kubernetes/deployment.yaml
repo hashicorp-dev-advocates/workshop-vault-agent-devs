@@ -14,86 +14,18 @@ spec:
     metadata:
       labels:
         app: payments-app
-      annotations:
-        # -----------------------------------------------------------------
-        # Vault Agent Injector annotations
-        #
-        # These annotations are read by the Vault Agent Injector webhook
-        # when this Pod is created. The injector automatically:
-        #   - Adds a vault-agent-init initContainer to render the secrets
-        #     file before the app container starts
-        #   - Adds a vault-agent sidecar container to keep leases renewed
-        #     and re-render the file when secrets rotate
-        #
-        # No agent.hcl file is required — the injector builds the agent
-        # configuration from these annotations at admission time.
-        # -----------------------------------------------------------------
-
-        # Enable injection for this Pod.
-        vault.hashicorp.com/agent-inject: "true"
-
-        # Address of the external Vault server (running in docker-compose on
-        # the vpcbr network at fixed IP 10.5.0.2). Without this annotation the
-        # injected agent would try the in-cluster vault service, which doesn't exist.
-        vault.hashicorp.com/vault-addr: "http://10.5.0.2:8200"
-
-        # The Vault role to authenticate as (maps to the Kubernetes auth
-        # role created in vault/setup.sh when KUBECONFIG is set).
-        vault.hashicorp.com/role: "payments-app"
-        vault.hashicorp.com/template-static-secret-render-interval: "1m" 
-
-        # --- Secret: vault-secrets.properties (credentials only) -----------
-        #
-        # Vault Agent writes ONLY credentials here. All non-secret config
-        # (datasource URL, driver class, JPA settings) lives in the committed
-        # base application.properties inside the image and is never overridden.
-        # Spring Boot merges both files via spring.config.import.
-
-        # Tell the injector to inject a secret rendered to a file named
-        # "vault-secrets.properties" inside /vault/secrets/.
-        vault.hashicorp.com/agent-inject-secret-vault-secrets.properties: "spring/kv/data/payments-app"
-
-        # Consul Template body — credentials only.
-        vault.hashicorp.com/agent-inject-template-vault-secrets.properties: |
-          {{- with secret "spring/kv/data/payments-app" }}
-          custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
-          custom.static-secret.password={{ index .Data.data "custom.static-secret.password" }}
-          {{- end }}
-          {{- with secret "database/creds/writer" }}
-          spring.datasource.username={{ .Data.username }}
-          spring.datasource.password={{ .Data.password }}
-          {{- end }}
-
-        # After each successful re-render, call /actuator/refresh so Spring
-        # re-binds @RefreshScope beans without restarting the container.
-        vault.hashicorp.com/agent-inject-command-vault-secrets.properties: >-
-          wget -q --header="Content-Type: application/json" --post-data="{}" http://127.0.0.1:8080/actuator/refresh -O /dev/null || true
-
-        # Revoke the dynamic DB lease when the Pod shuts down, so stale
-        # credentials do not accumulate in PostgreSQL.
-        vault.hashicorp.com/agent-revoke-on-shutdown: "true"
-
     spec:
       serviceAccountName: payments-app
 
       containers:
         - name: payments-app
-          # Replace with your image reference.
-          # For k3s with a local registry, use the imported image tag.
           image: ghcr.io/hashicorp-dev-advocates/payments-app-spring:1.0.0-spring
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:
-            # Tell Spring Boot where to import the Vault-rendered credentials file.
-            # The base application.properties (baked into the image) provides all
-            # non-secret defaults; this file adds only username and password.
-            # No "optional:" prefix — app fast-fails if the file is absent.
             - name: SPRING_CONFIG_IMPORT
               value: "file:/vault/secrets/vault-secrets.properties"
-            # Override the datasource URL to use the compose database service
-            # at its fixed vpcbr IP (10.5.0.3). k3s pods share the vpcbr
-            # network so this address is reachable from inside the cluster.
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://10.5.0.3:5432/payments"
           readinessProbe:

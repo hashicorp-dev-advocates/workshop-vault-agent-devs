@@ -7,7 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
 
 import javax.sql.DataSource;
@@ -52,8 +51,7 @@ public class PaymentsAppApplication {
      * a new one — each time {@code POST /actuator/refresh} is called.
      */
     @Bean
-    @RefreshScope
-	DataSource dataSource(DataSourceProperties properties) {
+    DataSource dataSource(DataSourceProperties properties) {
 		log.info("rebuild database secrets: " +
 				properties.getUsername() +
 				"," +
@@ -75,7 +73,6 @@ public class PaymentsAppApplication {
      * {@code POST /actuator/refresh} is called.
      */
     @Bean
-    @RefreshScope
     ExampleClient exampleClient(AppProperties properties) {
         log.info("rebuild ExampleClient with static-secret username: "
                 + properties.getStaticSecret().getUsername());
