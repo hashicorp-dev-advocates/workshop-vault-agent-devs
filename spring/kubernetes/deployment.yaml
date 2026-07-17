@@ -80,7 +80,7 @@ spec:
         - name: payments-app
           # Replace with your image reference.
           # For k3s with a local registry, use the imported image tag.
-          image: ghcr.io/hashicorp-dev-advocates/payments-app-spring:sha-d6b3a3e7a3d1b0739fc1577f4679ac96ab8f65cb
+          image: ghcr.io/hashicorp-dev-advocates/payments-app-spring:1.0.0-spring
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
