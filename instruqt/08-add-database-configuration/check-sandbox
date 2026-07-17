@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euxo pipefail
+
+if ! vault read database/creds/writer; then
+    fail-message "Set up a Vault role to write to the database"
+fi
+
+if ! vault read database/creds/reader; then
+    fail-message "Set up a Vault role to write to the database"
+fi

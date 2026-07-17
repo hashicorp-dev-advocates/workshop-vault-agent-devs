@@ -1,0 +1,78 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+VAULT_VERSION=1.21.4
+JDK_VERSION=23.0.2
+MAVEN_VERSION=3.9.16
+HELM_VERSION=3.17.3
+
+# Wait for the Instruqt host bootstrap to finish
+until [ -f /opt/instruqt/bootstrap/host-bootstrap-completed ]
+do
+    sleep 1
+done
+
+sudo systemctl stop unattended-upgrades
+
+sudo apt update
+sudo apt install -y jq postgresql-client unzip
+
+# install kubectl
+curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
+# install helm
+curl -LO https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz
+tar -xvf helm-v${HELM_VERSION}-linux-amd64.tar.gz
+sudo mv linux-amd64/helm /usr/local/bin/helm
+rm -rf linux-amd64 helm-v${HELM_VERSION}-linux-amd64.tar.gz
+
+# install vault CLI
+curl -LO https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip
+unzip vault_${VAULT_VERSION}_linux_amd64.zip
+chmod +x ./vault
+sudo mv ./vault /usr/local/bin/vault
+rm -f vault_${VAULT_VERSION}_linux_amd64.zip
+
+# install java
+wget -q https://download.oracle.com/java/23/archive/jdk-${JDK_VERSION}_linux-x64_bin.deb
+sudo apt install ./jdk-${JDK_VERSION}_linux-x64_bin.deb
+rm -f jdk-${JDK_VERSION}_linux-x64_bin.deb
+
+# install maven
+wget -q https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz
+tar -xvf apache-maven-${MAVEN_VERSION}-bin.tar.gz
+sudo mv apache-maven-${MAVEN_VERSION} /opt
+export PATH=/opt/apache-maven-${MAVEN_VERSION}/bin:$PATH
+echo -e "\nPATH=\"/opt/apache-maven-${MAVEN_VERSION}/bin:\$PATH\"" >> ~/.profile
+rm -f apache-maven-${MAVEN_VERSION}-bin.tar.gz
+
+# clone the workshop repository
+git clone https://github.com/hashicorp-dev-advocates/workshop-vault-agent-devs.git /root/workshop-vault-agent-devs
+
+cd /root/workshop-vault-agent-devs
+
+# create runtime directories that docker compose and vault-agent expect
+mkdir -p secrets tmp
+chmod 777 secrets/
+
+# generate a k3s cluster token (used by server + agent services)
+uuidgen > ./tmp/k3s.token
+
+# start infrastructure services only:
+#   vault        — Vault dev server
+#   database     — PostgreSQL
+#   vault-init   — one-shot Vault configuration
+#   server       — k3s server node
+#   agent        — k3s agent node
+#
+# vault-agent and payments-app are intentionally excluded:
+#   vault-agent  — participants start this manually in a Terminal tab
+#   payments-app — participants run this locally via ./mvnw spring-boot:run
+K3S_TOKEN=$(cat ./tmp/k3s.token) docker compose up -d vault database vault-init server agent
+
+# add the HashiCorp Helm chart repo for the Kubernetes section
+helm repo add hashicorp https://helm.releases.hashicorp.com
+helm repo update

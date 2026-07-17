@@ -11,7 +11,7 @@ Kubernetes variant deploys the app into an in-compose k3s cluster with the Vault
 
 | Path | Purpose |
 |------|---------|
-| `config/` | Setup scripts — `setup-local.sh` is the single entry-point for both variants |
+| `config/` | Setup scripts — `setup-local.sh` is the single entry-point for both variants; `workshop.sh` is the workshop solve script |
 | `spring/payments-app/` | Spring Boot 3 / Java 23 Maven project + Dockerfile |
 | `spring/vault/` | Vault Agent config (`agent.hcl`) and Consul Template (`secrets.ctmpl`) — local variant only |
 | `spring/kubernetes/` | Kubernetes manifests — see table below for full inventory |
@@ -93,3 +93,26 @@ Builds and publishes `ghcr.io/<owner>/payments-app-spring` to GitHub Container R
 - Tests skip during image build (`-DskipTests`) because they require a live database and
   secrets file.
 - Secrets are never hardcoded. All credentials come from Vault Agent at runtime.
+
+## Workshop starting state
+
+The `main` branch holds the **workshop starting state** — a deliberately incomplete
+configuration that participants build up challenge by challenge:
+
+| File | Starting state | Goal |
+|------|---------------|------|
+| `spring/vault/agent.hcl` | `vault {}` + `auto_auth {}` — missing `template_config` + `template` | Add `template_config` + `template` blocks |
+| `spring/vault/secrets.ctmpl` | KV static secret block only — `database/creds/writer` block missing | Add `database/creds/writer` block |
+| `spring/payments-app/src/main/resources/application.properties` | Hardcoded `username=postgres` / `password=postgres`; `management.endpoints.web.exposure.include=health` only | Add `spring.config.import`, expose `refresh` actuator |
+| `PaymentsAppApplication.java` | `@Bean` without `@RefreshScope` on both beans | Add `@RefreshScope` to both beans |
+| `spring/kubernetes/deployment.yaml` | No `vault.hashicorp.com/` annotations | Add full Vault Agent Injector annotation set |
+
+### Workshop solve script
+
+`config/workshop.sh` applies the **complete working configuration** in one step — use it
+to skip ahead or verify the final state. It writes all five files above as heredocs.
+
+```bash
+bash config/workshop.sh
+```
+

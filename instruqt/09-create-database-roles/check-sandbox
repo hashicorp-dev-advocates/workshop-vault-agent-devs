@@ -1,0 +1,8 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-spring-vault
+
+if ! grep "spring.cloud.vault.database.enabled=true" src/main/resources/application.properties; then
+    fail-message "Enable property for Spring application to read secrets from Vault"
+fi

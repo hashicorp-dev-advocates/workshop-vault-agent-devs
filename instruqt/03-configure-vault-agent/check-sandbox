@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-vault-agent-devs
+
+if ! grep -q "template_config" spring/vault/agent.hcl; then
+    fail-message "Add a \`template_config\` block to \`spring/vault/agent.hcl\`"
+fi
+
+if ! grep -q 'destination.*vault-secrets.properties' spring/vault/agent.hcl; then
+    fail-message "Add a \`template\` block with the correct destination to \`spring/vault/agent.hcl\`"
+fi
+
+if ! grep -q 'actuator/refresh' spring/vault/agent.hcl; then
+    fail-message "Add the \`command\` to call \`/actuator/refresh\` in the \`template\` block"
+fi

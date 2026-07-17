@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-vault-agent-devs
+
+if ! grep -q "spring.config.import=file:" spring/payments-app/src/main/resources/application.properties; then
+    fail-message "Add \`spring.config.import\` pointing at the Vault Agent rendered file"
+fi
+
+if ! grep -q "refresh" spring/payments-app/src/main/resources/application.properties; then
+    fail-message "Expose the \`refresh\` actuator endpoint in \`management.endpoints.web.exposure.include\`"
+fi
+
+if grep -q "spring.datasource.username=postgres" spring/payments-app/src/main/resources/application.properties; then
+    fail-message "Remove the hardcoded \`spring.datasource.username\` from application.properties"
+fi

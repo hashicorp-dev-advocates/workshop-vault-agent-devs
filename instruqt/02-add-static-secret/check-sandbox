@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euxo pipefail
+
+if [ "$( vault kv get -field="custom.static-secret.username" spring/kv/payments-app )" != "nic" ]; then
+  fail-message "Write the correct username property to \`spring/kv/payments-app\`"
+fi
+
+if [ "$( vault kv get -field="custom.static-secret.password" spring/kv/payments-app )" != "H@rdT0Gu3ss" ]; then
+  fail-message "Write the correct password property to \`spring/kv/payments-app\`"
+fi

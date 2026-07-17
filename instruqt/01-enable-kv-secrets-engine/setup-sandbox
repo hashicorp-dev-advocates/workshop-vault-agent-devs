@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -euxo pipefail
+
+cd /root/workshop-vault-agent-devs
+
+mvn package -DskipTests -f spring/payments-app/pom.xml

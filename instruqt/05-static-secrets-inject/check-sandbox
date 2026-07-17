@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-vault-agent-devs
+
+APP_FILE="spring/payments-app/src/main/java/com/hashicorp/workshop/paymentsapp/PaymentsAppApplication.java"
+
+if ! grep -q "@RefreshScope" "${APP_FILE}"; then
+    fail-message "Add \`@RefreshScope\` to the \`exampleClient\` bean in PaymentsAppApplication.java"
+fi
