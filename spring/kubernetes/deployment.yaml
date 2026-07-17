@@ -32,9 +32,15 @@ spec:
         # Enable injection for this Pod.
         vault.hashicorp.com/agent-inject: "true"
 
+        # Address of the external Vault server (running in docker-compose on
+        # the vpcbr network at fixed IP 10.5.0.2). Without this annotation the
+        # injected agent would try the in-cluster vault service, which doesn't exist.
+        vault.hashicorp.com/vault-addr: "http://10.5.0.2:8200"
+
         # The Vault role to authenticate as (maps to the Kubernetes auth
-        # role created in vault/setup-k8s.sh).
+        # role created in vault/setup.sh when KUBECONFIG is set).
         vault.hashicorp.com/role: "payments-app"
+        vault.hashicorp.com/template-static-secret-render-interval: "1m" 
 
         # --- Secret: vault-secrets.properties (credentials only) -----------
         #
@@ -61,7 +67,7 @@ spec:
         # After each successful re-render, call /actuator/refresh so Spring
         # re-binds @RefreshScope beans without restarting the container.
         vault.hashicorp.com/agent-inject-command-vault-secrets.properties: >-
-          curl -sf -X POST http://localhost:8080/actuator/refresh || true
+          wget -q --header="Content-Type: application/json" --post-data="{}" http://127.0.0.1:8080/actuator/refresh -O /dev/null || true
 
         # Revoke the dynamic DB lease when the Pod shuts down, so stale
         # credentials do not accumulate in PostgreSQL.
@@ -74,7 +80,7 @@ spec:
         - name: payments-app
           # Replace with your image reference.
           # For k3s with a local registry, use the imported image tag.
-          image: ghcr.io/hashicorp-dev-advocates/payments-app-spring:sha-e2356a3642fb2c0fb137267272e7a252d7872ab3
+          image: ghcr.io/hashicorp-dev-advocates/payments-app-spring:sha-d6b3a3e7a3d1b0739fc1577f4679ac96ab8f65cb
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
@@ -85,11 +91,11 @@ spec:
             # No "optional:" prefix — app fast-fails if the file is absent.
             - name: SPRING_CONFIG_IMPORT
               value: "file:/vault/secrets/vault-secrets.properties"
-            # Override the datasource URL for the in-cluster postgres service.
-            # The base application.properties defaults to "postgres:5432" (Docker
-            # Compose service name); in Kubernetes the FQDN is used instead.
+            # Override the datasource URL to use the compose database service
+            # at its fixed vpcbr IP (10.5.0.3). k3s pods share the vpcbr
+            # network so this address is reachable from inside the cluster.
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres.default.svc.cluster.local:5432/payments"
+              value: "jdbc:postgresql://10.5.0.3:5432/payments"
           readinessProbe:
             httpGet:
               path: /actuator/health

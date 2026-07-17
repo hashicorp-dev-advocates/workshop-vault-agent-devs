@@ -3,25 +3,27 @@
 # vault/setup.sh
 #
 # Configures a dev-mode Vault server for the Spring Boot payments-app tutorial.
+# Works for both the Docker Compose variant and the Kubernetes (k3s) variant.
 #
 # What this script does:
 #   1. Enables KV v2 secrets engine at "spring/kv/"
 #   2. Writes sample static secrets for the payments-app
 #   3. Enables the database secrets engine at "database/"
-#   4. Configures the PostgreSQL plugin (targeting the "postgres" Docker service)
+#   4. Configures the PostgreSQL plugin (fixed IP 10.5.0.3)
 #   5. Creates a "payments-app" database role with short-lived credentials
 #   6. Writes and applies the payments-app Vault policy
-#   7. Creates a Vault token scoped to that policy and writes it to secrets/vault-token
+#   7. Creates a Vault token scoped to that policy (Docker Compose variant)
+#   8. Configures Kubernetes auth (only when KUBECONFIG is set — k3s variant)
 #
 # Prerequisites:
 #   - VAULT_ADDR   must be set (e.g. http://127.0.0.1:8200)
 #   - VAULT_TOKEN  must be set to the root / admin token
-#   - The "postgres" service must be reachable at the connection URL below
-#   - The "secrets/" directory must exist and be writable
+#   - The "database" service must be reachable at 10.5.0.3:5432
+#   - The "secrets/" directory must exist and be writable (Docker Compose path)
 #
 # Usage (from repo root):
 #   export VAULT_ADDR=http://127.0.0.1:8200
-#   export VAULT_TOKEN=root
+#   export VAULT_TOKEN=root-token
 #   bash vault/setup.sh
 # =============================================================================
 
@@ -95,7 +97,7 @@ vault secrets enable database || log "database secrets engine already enabled, s
 log "Configuring PostgreSQL database plugin connection ..."
 vault write database/config/payments-app \
   plugin_name="postgresql-database-plugin" \
-  connection_url="postgresql://{{username}}:{{password}}@postgres:5432/payments?sslmode=disable" \
+  connection_url="postgresql://{{username}}:{{password}}@10.5.0.3:5432/payments?sslmode=disable" \
   allowed_roles="payments-app" \
   username="postgres" \
   password="postgres"
@@ -176,3 +178,48 @@ log "  KV v2 path        : spring/kv/payments-app  (custom.static-secret.usernam
 log "  Database role     : database/roles/payments-app"
 log "  Policy            : payments-app"
 log "  Agent token file  : ${SECRETS_DIR}/vault-token"
+
+# ---------------------------------------------------------------------------
+# 8. Configure Kubernetes auth (k3s variant only)
+#
+#    This section runs only when KUBECONFIG is set, which happens when
+#    vault/setup-k8s.sh calls this script on the host. When the script runs
+#    inside the vault-init Docker Compose container, KUBECONFIG is not set and
+#    this section is skipped entirely — preserving the Docker Compose behaviour.
+#
+#    The vault-auth ServiceAccount (vault/service-account.yaml) must already
+#    be applied to the cluster before this section runs. It provides the
+#    token and CA certificate Vault uses to verify incoming Pod JWTs via the
+#    Kubernetes TokenReview API.
+# ---------------------------------------------------------------------------
+if [ -n "${KUBECONFIG:-}" ]; then
+  log "KUBECONFIG is set — configuring Kubernetes auth for k3s variant ..."
+
+  log "Enabling Kubernetes auth method ..."
+  vault auth enable kubernetes || log "Kubernetes auth already enabled, skipping."
+
+  log "Extracting vault-auth SA token and CA from cluster ..."
+  mkdir -p tmp/
+  kubectl get secret -n vault vault-k8s-auth-secret -o jsonpath='{.data.token}' \
+    | base64 -d > tmp/k8s.token
+  kubectl get secret -n vault vault-k8s-auth-secret -o jsonpath='{.data.ca\.crt}' \
+    | base64 -d > tmp/k8s.crt
+
+  log "Configuring Kubernetes auth method ..."
+  vault write auth/kubernetes/config \
+    token_reviewer_jwt="$(cat tmp/k8s.token)" \
+    kubernetes_host="https://10.5.0.4:6443" \
+    kubernetes_ca_cert=@tmp/k8s.crt
+
+  log "Creating Kubernetes auth role for payments-app ..."
+  vault write auth/kubernetes/role/payments-app \
+    bound_service_account_names="payments-app" \
+    bound_service_account_namespaces="default" \
+    policies="payments-app" \
+    ttl="1h"
+
+  log "Kubernetes auth configured."
+  log "  Auth method : auth/kubernetes"
+  log "  k3s API     : https://10.5.0.4:6443"
+  log "  Role        : payments-app (SA: payments-app, namespace: default)"
+fi

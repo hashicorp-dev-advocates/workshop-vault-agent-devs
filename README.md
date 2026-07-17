@@ -20,6 +20,8 @@ rotate, Vault Agent re-renders the file and calls `POST /actuator/refresh` to re
 ## Repository layout
 
 ```
+config/
+  setup-local.sh          One-command setup for both variants (compose + k3s)
 spring/
   payments-app/           Spring Boot 3 / Java 23 Maven project
     src/
@@ -29,17 +31,17 @@ spring/
     agent.hcl             Vault Agent config — local variant (token file auth)
     secrets.ctmpl         Consul Template → vault-secrets.properties
   kubernetes/
-    serviceaccount.yaml   payments-app ServiceAccount
+    serviceaccount.yaml   payments-app ServiceAccount + token Secret
     deployment.yaml       Deployment with Vault Injector annotations
-    service.yaml          ClusterIP Service
+    service.yaml          NodePort Service (port 30080)
 vault/
-  setup.sh                One-shot Vault config script — local variant
-  setup-k8s.sh            Vault Helm install + k8s auth config — k3s variant
+  setup.sh                Vault config script — KV, database engine, policy, k8s auth
+  service-account.yaml    vault-auth ServiceAccount + ClusterRoleBinding (for k8s auth TokenReview)
   policies/
     payments-app.hcl      Vault policy (read KV + database creds)
   postgres-init.sql       Creates the payments table on first postgres start
 secrets/                  Runtime secrets written by Vault Agent — git-ignored
-docker-compose.yml        Local tutorial stack (5 services)
+docker-compose.yaml       Full tutorial stack (vault, postgres, vault-init, vault-agent, payments-app, k3s)
 ```
 
 ---
@@ -137,7 +139,7 @@ Update the static KV secret in the running Vault and watch Spring pick it up wit
 
 ```bash
 export VAULT_ADDR=http://localhost:8200
-export VAULT_TOKEN=root
+export VAULT_TOKEN=root-token
 
 vault kv put spring/kv/payments-app \
   "custom.static-secret.username=new-user" \
@@ -162,6 +164,84 @@ cat secrets/vault-secrets.properties
 ```bash
 podman compose down -v
 rm -f secrets/vault-token secrets/vault-secrets.properties
+```
+
+---
+
+## Kubernetes variant — k3s + Vault Agent Injector
+
+The Kubernetes variant uses the same `payments-app` container image. Vault Agent is injected
+automatically by the **Vault Agent Injector** based on Pod annotations — no `agent.hcl` file
+is authored manually.
+
+### Prerequisites
+
+- [Podman](https://podman.io) 5+ and `podman compose`
+- `kubectl`
+- `helm` v3 (`brew install helm`)
+
+### One-command setup
+
+```bash
+mkdir -p tmp secrets
+chmod 777 secrets/
+bash config/setup-local.sh
+```
+
+`config/setup-local.sh` does everything in order:
+
+1. Generates `./tmp/k3s.token` (once) and starts the full compose stack
+2. Waits for k3s to be ready (`./tmp/kubeconfig.yaml` written by the k3s server container)
+3. Creates the `vault` namespace and applies `vault/service-account.yaml`
+4. Runs `vault/setup.sh` locally — configures KV, database engine, policy, **and**
+   Kubernetes auth (because `KUBECONFIG` is set)
+5. Installs only the Vault Agent Injector via Helm (`hashicorp/vault` chart, `server.enabled=false`,
+   `injector.externalVaultAddr=http://10.5.0.2:8200`)
+
+### Deploy application manifests
+
+```bash
+export KUBECONFIG=./tmp/kubeconfig.yaml
+
+kubectl apply -f spring/kubernetes/
+
+# Watch the Pod start — you will see vault-agent-init then vault-agent sidecar
+kubectl get pods -w
+```
+
+### Test
+
+```bash
+# NodePort — reachable at the k3s node IP
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+curl http://${NODE_IP}:30080/actuator/health
+curl http://${NODE_IP}:30080/payments
+curl http://${NODE_IP}:30080/payments/secret
+
+# Or port-forward
+kubectl port-forward svc/payments-app 8081:8080
+curl http://localhost:8081/payments
+```
+
+### Verify secret injection
+
+```bash
+# Confirm the injected agent rendered the secrets file
+kubectl exec deployment/payments-app -c payments-app -- \
+  cat /vault/secrets/vault-secrets.properties
+```
+
+### Reset
+
+```bash
+# Tear down everything
+podman compose down -v
+rm -rf tmp/ secrets/vault-token secrets/vault-secrets.properties
+
+# Remove k3s resources (if cluster still running)
+kubectl delete -f spring/kubernetes/ --ignore-not-found
+helm uninstall vault-injector -n vault --ignore-not-found
+kubectl delete namespace vault --ignore-not-found
 ```
 
 ---
@@ -197,49 +277,6 @@ auto-provided `GITHUB_TOKEN` — no additional secrets are required.
 
 Images are built for both `linux/amd64` and `linux/arm64` via Docker Buildx with GitHub
 Actions cache (`type=gha`) to speed up repeated builds.
-
----
-
-## Kubernetes variant — k3s + Vault Agent Injector
-
-The Kubernetes variant uses the same `payments-app` container image. Vault Agent is injected
-automatically by the **Vault Agent Injector** based on Pod annotations — no `agent.hcl` file
-is authored manually.
-
-### Prerequisites
-
-- [k3s](https://k3s.io) running locally (`curl -sfL https://get.k3s.io | sh -`)
-- `kubectl` configured to target the k3s cluster
-- `helm` v3 (`brew install helm`)
-- A PostgreSQL pod/service running in the cluster  
-  (deploy using `postgres:16` and `vault/postgres-init.sql` as the init script)
-
-### Deploy
-
-```bash
-# 1. Install Vault via Helm (dev mode + injector) and configure secrets engines + k8s auth
-bash vault/setup-k8s.sh
-
-# 2. Build the payments-app image and import it into k3s
-podman build -t payments-app:latest ./spring/payments-app
-k3s ctr images import <(podman save payments-app:latest)
-
-# 3. Apply Kubernetes manifests
-kubectl apply -f spring/kubernetes/
-
-# 4. Watch the Pod start — you will see vault-agent-init then vault-agent sidecar
-kubectl get pods -w
-```
-
-### Test
-
-```bash
-kubectl port-forward svc/payments-app 8080:8080
-
-curl http://localhost:8080/actuator/health
-curl http://localhost:8080/payments
-curl http://localhost:8080/payments/secret
-```
 
 ---
 
