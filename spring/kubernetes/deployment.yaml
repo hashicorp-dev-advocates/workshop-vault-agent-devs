@@ -59,7 +59,7 @@ spec:
           custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
           custom.static-secret.password={{ index .Data.data "custom.static-secret.password" }}
           {{- end }}
-          {{- with secret "database/creds/payments-app" }}
+          {{- with secret "database/creds/writer" }}
           spring.datasource.username={{ .Data.username }}
           spring.datasource.password={{ .Data.password }}
           {{- end }}

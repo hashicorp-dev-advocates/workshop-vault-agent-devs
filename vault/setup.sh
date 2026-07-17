@@ -10,7 +10,7 @@
 #   2. Writes sample static secrets for the payments-app
 #   3. Enables the database secrets engine at "database/"
 #   4. Configures the PostgreSQL plugin (fixed IP 10.5.0.3)
-#   5. Creates a "payments-app" database role with short-lived credentials
+#   5. Creates "writer" and "reader" database roles with separate TTLs
 #   6. Writes and applies the payments-app Vault policy
 #   7. Creates a Vault token scoped to that policy (Docker Compose variant)
 #   8. Configures Kubernetes auth (only when KUBECONFIG is set — k3s variant)
@@ -98,7 +98,7 @@ log "Configuring PostgreSQL database plugin connection ..."
 vault write database/config/payments-app \
   plugin_name="postgresql-database-plugin" \
   connection_url="postgresql://{{username}}:{{password}}@10.5.0.3:5432/payments?sslmode=disable" \
-  allowed_roles="payments-app" \
+  allowed_roles="writer,reader" \
   username="postgres" \
   password="postgres"
 
@@ -109,23 +109,38 @@ vault write database/config/payments-app \
 # the management password going forward.
 
 # ---------------------------------------------------------------------------
-# 5. Create the "payments-app" database role
+# 5. Create "writer" and "reader" database roles
 #
-#    - creation_statements: SQL run when a new dynamic user is created.
-#      Grants only the permissions the application needs (SELECT, INSERT,
-#      UPDATE, DELETE on the payments schema).
-#    - default_ttl: credentials live for 1 hour before Vault tries to renew.
-#    - max_ttl: hard ceiling of 24 hours; after this Vault revokes the creds
-#      and Vault Agent renders new ones, triggering /actuator/refresh.
+#    writer — full read/write access, short TTL (1m default / 2m max).
+#      Short TTLs force frequent rotation so compromised write credentials
+#      expire quickly. Vault Agent re-renders and /actuator/refresh rebuilds
+#      the DataSource pool automatically.
+#
+#    reader — read-only access, longer TTL (1h default / 24h max).
+#      Suitable for reporting queries or read-replicas where frequent
+#      reconnection is undesirable.
 # ---------------------------------------------------------------------------
-log "Creating payments-app database role ..."
-vault write database/roles/payments-app \
+log "Creating writer database role ..."
+vault write database/roles/writer \
   db_name="payments-app" \
   creation_statements="
     CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
     GRANT CONNECT ON DATABASE payments TO \"{{name}}\";
     GRANT USAGE ON SCHEMA public TO \"{{name}}\";
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.payments TO \"{{name}}\";
+    GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO \"{{name}}\";
+  " \
+  default_ttl="1m" \
+  max_ttl="2m"
+
+log "Creating reader database role ..."
+vault write database/roles/reader \
+  db_name="payments-app" \
+  creation_statements="
+    CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+    GRANT CONNECT ON DATABASE payments TO \"{{name}}\";
+    GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+    GRANT SELECT ON TABLE public.payments TO \"{{name}}\";
     GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO \"{{name}}\";
   " \
   default_ttl="1h" \
@@ -175,7 +190,7 @@ log "Vault setup complete."
 log ""
 log "Summary:"
 log "  KV v2 path        : spring/kv/payments-app  (custom.static-secret.username / .password)"
-log "  Database role     : database/roles/payments-app"
+log "  Database roles    : database/roles/writer (1m/2m TTL)  database/roles/reader (1h/24h TTL)"
 log "  Policy            : payments-app"
 log "  Agent token file  : ${SECRETS_DIR}/vault-token"
 

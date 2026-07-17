@@ -3,6 +3,8 @@
 # Grants the payments-app the minimum permissions it needs to read secrets:
 #   - Static secrets from the KV v2 store (API keys, endpoint config)
 #   - Dynamic PostgreSQL credentials from the database secrets engine
+#     writer — short-lived read/write credentials (1m/2m TTL)
+#     reader — longer-lived read-only credentials (1h/24h TTL)
 #
 # This policy is applied to both:
 #   - The local Vault token used by Vault Agent (docker-compose variant)
@@ -19,7 +21,12 @@ path "spring/kv/metadata/payments-app" {
   capabilities = ["read"]
 }
 
-# Database secrets engine: generate dynamic PostgreSQL credentials
-path "database/creds/payments-app" {
+# Database secrets engine: generate dynamic read/write PostgreSQL credentials
+path "database/creds/writer" {
+  capabilities = ["read"]
+}
+
+# Database secrets engine: generate dynamic read-only PostgreSQL credentials
+path "database/creds/reader" {
   capabilities = ["read"]
 }
