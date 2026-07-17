@@ -1,13 +1,11 @@
 package com.hashicorp.workshop.paymentsapp;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Bean;
@@ -37,9 +35,7 @@ import javax.sql.DataSource;
  * them. Defining {@code @RefreshScope} on a {@code @ConfigurationProperties}
  * class alone does not trigger recreation on refresh.
  */
-// Exclude DataSource auto-configuration so our @RefreshScope DataSource
-// bean is the sole DataSource definition — prevents a conflicting bean error.
-@SpringBootApplication(exclude = {DataSourceAutoConfiguration.class})
+@SpringBootApplication
 @EnableConfigurationProperties(AppProperties.class)
 public class PaymentsAppApplication {
 
@@ -50,30 +46,27 @@ public class PaymentsAppApplication {
     }
 
     /**
-     * Constructs a HikariCP {@link DataSource} from dynamic PostgreSQL credentials
+     * Constructs a {@link DataSource} from the {@code spring.datasource.*} properties
      * rendered by Vault Agent. Annotated with {@code @RefreshScope} so that Spring
      * destroys and recreates this bean — closing the old connection pool and opening
      * a new one — each time {@code POST /actuator/refresh} is called.
      */
     @Bean
     @RefreshScope
-    DataSource dataSource(
-            @Value("${spring.datasource.url}") String url,
-            @Value("${spring.datasource.username}") String username,
-            @Value("${spring.datasource.password}") String password) {
-        log.info("rebuild DataSource with username: " + username);
+	DataSource dataSource(DataSourceProperties properties) {
+		log.info("rebuild database secrets: " +
+				properties.getUsername() +
+				"," +
+				properties.getPassword()
+		);
 
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(url);
-        config.setUsername(username);
-        config.setPassword(password);
-        // Keep the pool small for the tutorial environment.
-        config.setMaximumPoolSize(5);
-        config.setMinimumIdle(1);
-        config.setConnectionTimeout(10_000);
-        config.setIdleTimeout(60_000);
-        return new HikariDataSource(config);
-    }
+		return DataSourceBuilder
+				.create()
+				.url(properties.getUrl())
+				.username(properties.getUsername())
+				.password(properties.getPassword())
+				.build();
+	}
 
     /**
      * Constructs an {@link ExampleClient} from static KV v2 credentials
