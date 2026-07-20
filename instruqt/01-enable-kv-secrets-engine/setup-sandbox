@@ -2,7 +2,7 @@
 
 set -euxo pipefail
 
-source ~/.profile
+source ~/.bashrc
 
 cd /root/workshop-vault-agent-devs
 

@@ -46,7 +46,7 @@ wget -q https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-
 tar -xvf apache-maven-${MAVEN_VERSION}-bin.tar.gz
 sudo mv apache-maven-${MAVEN_VERSION} /opt
 export PATH=/opt/apache-maven-${MAVEN_VERSION}/bin:$PATH
-echo -e "\nPATH=\"/opt/apache-maven-${MAVEN_VERSION}/bin:\$PATH\"" >> ~/.profile
+echo -e "\nPATH=\"/opt/apache-maven-${MAVEN_VERSION}/bin:\$PATH\"" >> ~/.bashrc
 rm -f apache-maven-${MAVEN_VERSION}-bin.tar.gz
 
 rm -f vault_${VAULT_VERSION}_linux_amd64.zip apache-maven-${MAVEN_VERSION}-bin.tar.gz jdk-${JDK_VERSION}_linux-x64_bin.deb mvnw mvnw.cmd
@@ -78,5 +78,3 @@ K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up -d vault database vault-init 
 # add the HashiCorp Helm chart repo for the Kubernetes section
 helm repo add hashicorp https://helm.releases.hashicorp.com
 helm repo update
-
-source ~/.profile
