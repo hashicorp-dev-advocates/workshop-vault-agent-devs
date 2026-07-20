@@ -44,8 +44,7 @@ services:
     ports:
       - "127.0.0.1:8200:8200"
     volumes:
-      - vault-logs:/vault/logs
-      - vault-file:/vault/file
+      - vault-data:/vault
     networks:
       vpcbr:
         ipv4_address: 10.5.0.2
@@ -93,11 +92,10 @@ services:
       VAULT_TOKEN: "root-token"
       SECRETS_DIR: /secrets
     volumes:
-      - ./vault:/vault:ro
+      - ./vault:/vault-config:ro
       - ./secrets:/secrets
-      - vault-init-logs:/vault/logs
-      - vault-init-file:/vault/file
-    entrypoint: ["sh", "/vault/setup.sh"]
+      - vault-data:/vault
+    entrypoint: ["sh", "/vault-config/setup.sh"]
     restart: "no"
     networks:
       vpcbr:
@@ -122,8 +120,7 @@ services:
     volumes:
       - ./spring/vault:/spring/vault:ro
       - ./secrets:/secrets
-      - vault-agent-logs:/vault/logs
-      - vault-agent-file:/vault/file
+      - vault-agent-data:/vault
     entrypoint:
       - sh
       - -ec
@@ -229,12 +226,8 @@ services:
 
 volumes:
   postgres-data: {}
-  vault-logs: {}
-  vault-file: {}
-  vault-init-logs: {}
-  vault-init-file: {}
-  vault-agent-logs: {}
-  vault-agent-file: {}
+  vault-data: {}
+  vault-agent-data: {}
   k3s-server: {}
   k3s-agent: {}
 
