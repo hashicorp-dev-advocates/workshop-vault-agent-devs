@@ -68,7 +68,7 @@ docker-compose.yaml       Full tutorial stack (vault, postgres, vault-init, vaul
 ┌───────────────────────────────┐
 │  payments-app (Spring Boot)   │
 │  ExampleClient                │  @Bean @RefreshScope — rebuilt with static KV credentials
-│  DataSource (HikariCP)        │  @Bean @RefreshScope — rebuilt with dynamic DB credentials
+│  DataSource                   │  @Bean @RefreshScope — rebuilt with dynamic DB credentials
 └───────────────────────────────┘
                 ▲
                 │  POST /actuator/refresh  (called by Vault Agent after each render)
@@ -312,3 +312,70 @@ spring.config.import=file:/vault/secrets/vault-secrets.properties
 # Exposes /actuator/refresh (called by Vault Agent) and /actuator/health
 management.endpoints.web.exposure.include=refresh,health
 ```
+
+---
+
+## Instruqt Workshop
+
+This repository backs the **[Using Vault Agent for Applications](https://play.instruqt.com/hashicorp-field-ops/tracks/workshop-apps-vault-agent)** Instruqt track.
+
+The track walks participants through a **red-green-refactor** approach: each challenge starts
+from a deliberately broken starting state and asks participants to add exactly the piece that
+makes it work.
+
+### Challenge map
+
+| # | Challenge | What participant does |
+|---|-----------|-----------------------|
+| 01 | Enable KV secrets engine | `vault secrets enable -path=spring/kv -version=2 kv` |
+| 02 | Add static secret | Write `custom.static-secret.*` keys to `spring/kv/payments-app` |
+| 03 | Configure Vault Agent | Fill in `template_config` + `template` blocks in `agent.hcl`; write `secrets.ctmpl` |
+| 04 | Configure Spring (static) | Add `spring.config.import` + expose `refresh` actuator; remove hardcoded creds |
+| 05 | Add `@RefreshScope` to `ExampleClient` | Annotate the `exampleClient` bean method |
+| 06 | Test static secrets | Run Vault Agent + app; update KV secret; observe live-reload |
+| 07 | Enable database secrets engine | `vault secrets enable database` |
+| 08 | Add database configuration | Configure PostgreSQL plugin + rotate root credentials |
+| 09 | Create database roles | Create `writer` and `reader` Vault database roles |
+| 10 | Extend template for dynamic secrets | Add `database/creds/writer` block to `secrets.ctmpl` |
+| 11 | Add `@RefreshScope` to `DataSource` | Annotate the `dataSource` bean method |
+| 12 | Test dynamic secrets | Run Vault Agent + app; observe credential rotation via log |
+| 13 | Kubernetes — configure authentication | Verify k8s auth method is enabled + Injector is installed |
+| 14 | Kubernetes — control access | Write `payments-app` policy + Vault Kubernetes auth role |
+| 15 | Kubernetes — add live-reload annotation | Add `agent-inject-command` annotation to `deployment.yaml` |
+| 16 | Kubernetes — test application | `kubectl apply`; verify 2/2 running; call `/payments` endpoint |
+
+### Solve script
+
+`config/workshop.sh` applies the **complete working state** of every file that participants
+modify during the track. Run it to skip ahead to the fully-wired state:
+
+```bash
+bash config/workshop.sh
+```
+
+The script writes:
+- `spring/vault/agent.hcl` — full Vault Agent config with `template_config` + `template`
+- `spring/vault/secrets.ctmpl` — KV + dynamic database credential blocks
+- `spring/payments-app/src/main/resources/application.properties` — `spring.config.import` + actuator
+- `spring/payments-app/src/main/java/…/PaymentsAppApplication.java` — both beans with `@RefreshScope`
+- `spring/kubernetes/deployment.yaml` — full Vault Injector annotation set including `agent-inject-command`
+
+### Instruqt track structure
+
+```
+instruqt/
+  track.yml                         Track metadata (slug: workshop-apps-vault-agent)
+  config.yml                        Sandbox environment config (KUBECONFIG, VAULT_ADDR, etc.)
+  track_scripts/setup-sandbox       Global setup: installs toolchain, clones repo, starts infra
+  01-enable-kv-secrets-engine/
+  02-add-static-secret/
+  …
+  16-kubernetes-test/
+```
+
+Each challenge directory contains:
+- `assignment.md` — the Instruqt challenge definition (front-matter + instructions)
+- `check-sandbox` — bash script run when participant clicks **Check** (uses `fail-message`)
+- `setup-sandbox` *(some challenges)* — bash script that pre-populates files for the red state
+- `cleanup-sandbox` *(test challenges)* — stops `vault-agent` and the Spring process between challenges
+

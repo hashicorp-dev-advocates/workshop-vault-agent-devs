@@ -1,4 +1,4 @@
 #!/bin/bash
 set -euxo pipefail
 
-pkill mvnw
+kubectl delete -f /root/workshop-vault-agent-devs/spring/kubernetes/ || true

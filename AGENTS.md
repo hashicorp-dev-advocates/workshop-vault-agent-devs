@@ -105,7 +105,7 @@ configuration that participants build up challenge by challenge:
 | `spring/vault/secrets.ctmpl` | KV static secret block only — `database/creds/writer` block missing | Add `database/creds/writer` block |
 | `spring/payments-app/src/main/resources/application.properties` | Hardcoded `username=postgres` / `password=postgres`; `management.endpoints.web.exposure.include=health` only | Add `spring.config.import`, expose `refresh` actuator |
 | `PaymentsAppApplication.java` | `@Bean` without `@RefreshScope` on both beans | Add `@RefreshScope` to both beans |
-| `spring/kubernetes/deployment.yaml` | No `vault.hashicorp.com/` annotations | Add full Vault Agent Injector annotation set |
+| `spring/kubernetes/deployment.yaml` | All `vault.hashicorp.com/` annotations present **except** `agent-inject-command-vault-secrets.properties` (a `# TODO:` comment marks the gap) | Add the missing `agent-inject-command-vault-secrets.properties` annotation to trigger `POST /actuator/refresh` on every re-render |
 
 ### Workshop solve script
 

@@ -1,0 +1,12 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-vault-agent-devs
+
+APP_FILE="spring/payments-app/src/main/java/com/hashicorp/workshop/paymentsapp/PaymentsAppApplication.java"
+
+REFRESH_SCOPE_COUNT=$(grep -c '@RefreshScope' "${APP_FILE}" || true)
+
+if [ "${REFRESH_SCOPE_COUNT}" -lt 2 ]; then
+    fail-message "Add \`@RefreshScope\` to the \`dataSource\` bean in PaymentsAppApplication.java"
+fi

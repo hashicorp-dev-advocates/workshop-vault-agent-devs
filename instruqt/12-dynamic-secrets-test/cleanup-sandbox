@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euxo pipefail
+
+cd /root/workshop-vault-agent-devs
+docker compose stop vault-agent
+pkill -f "spring-boot:run" || true

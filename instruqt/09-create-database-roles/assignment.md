@@ -1,124 +1,131 @@
 ---
-slug: dynamic-secrets-configure-spring
+slug: create-database-roles
 id: 9l1byqbc0krz
 type: challenge
-title: Dynamic Secrets - Configure Spring application
-teaser: Refactor Spring application properties to retrieve a database username and
-  password from Vault.
+title: Dynamic Secrets - Create Vault roles to access database
+teaser: Define writer and reader roles that control the permissions and TTL of generated credentials.
 notes:
 - type: text
   contents: |-
-    There are two main libraries for Spring applications to make requests to Vault.
+    A Vault role defines what SQL is run when credentials are generated, and how long
+    those credentials live. When Vault Agent requests credentials, it uses a specific role —
+    the role determines what the database user is allowed to do.
 
-    1. Spring Vault - base library with interfaces to make requests to the Vault API.
-    1. Spring Cloud Vault - library integrating with Spring Cloud configuration to automatically
-       request secrets from Vault and inject them into application properties.
-
-    This workshop primarily focuses on using Spring Cloud Vault to
-    automatically read secrets from Vault and inject them as application properties.
-
-    Alternatively, you can write code that uses Spring Vault, the base library, to retrieve a secret from
-    Vault's key-value secrets engine. In general, Spring Cloud Vault minimizes the
-    extra code you need to write by automatically reading and injecting secrets into application properties.
+    Short TTLs force frequent rotation. Vault Agent handles this automatically:
+    it renews leases, re-renders the template with fresh credentials, and triggers
+    `POST /actuator/refresh` so the application reconnects without a restart.
 tabs:
-- id: e1l1jhry4ayz
-  title: Code
-  type: code
-  hostname: sandbox
-  path: /root/workshop-spring-vault
-- id: nbj4ayyi3qzo
+- id: 0ioahiydtmca
   title: Terminal
   type: terminal
   hostname: sandbox
+- id: 9tz9m4lmhgci
+  title: Code
+  type: code
+  hostname: sandbox
+  path: /root/workshop-vault-agent-devs
 difficulty: ""
 timelimit: 0
 enhanced_loading: null
 ---
 
-Spring Cloud Vault has a database backend that retrieves secrets from a given database secrets engine and
-automatically injects the database username and password into `spring.datasource.username` and
-`spring.datasource.password`.
-
-For more details, review: https://cloud.spring.io/spring-cloud-vault/reference/html/#vault.config.backends.database
-
-Recall that you set up a database secrets engine at the `database/` backend with a Vault role named `writer`
-for the application to insert records into the database.
-
-Configure local authentication to Vault
+Create a Vault role to write to the database
 ===
 
-You will test the application **locally** in this first section of the workshop.
-For local testing only, get a token from Vault and pass it as an environment
-variable to application properties.
+Create a `writer` role for the application to insert and update records in the `payments` table.
+Set a short TTL of 1 minute default and 2 minute maximum — this forces frequent rotation
+and demonstrates live credential refresh.
 
-Open `src/main/resources/application.properties` in the **Code** tab.
-
-The application properties define the Vault URI and token for
-the application to locally authenticate to Vault for testing.
-Note that the `spring.cloud.vault.token` references the
-`VAULT_TOKEN` environment variable.
-
-```java,nocopy
-spring.cloud.vault.uri=${VAULT_ADDR:http://127.0.0.1:8200}
-spring.cloud.vault.token=${VAULT_TOKEN}
-```
-
-Configure Spring to read database secrets from Vault
-===
-
-Open `src/main/resources/application.properties` in the **Code** tab.
-
-The application properties update the Spring Cloud configuration
-to import secrets from Vault.
-
-```java,nocopy
-spring.config.import=vault://
-```
-
-However, the application property to read from Vault's key-value engine is currently disabled.
-
-```java,nocopy
-spring.cloud.vault.database.enabled=false
-```
-
-Change the `spring.cloud.vault.database.enabled` property to `true`.
+> [!NOTE]
+> This TTL is intentionally short for workshop purposes. Production TTLs should be longer.
 
 <details>
 <summary><b>Solution</b></summary>
-Change the property to true in the <b>Code</b> tab.
+Run the following command in the <b>Terminal</b> tab.
 
-```java
-spring.cloud.vault.database.enabled=true
+```shell
+vault write database/roles/writer \
+  db_name="payments-app" \
+  creation_statements="
+    CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+    GRANT CONNECT ON DATABASE payments TO \"{{name}}\";
+    GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.payments TO \"{{name}}\";
+    GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO \"{{name}}\";
+  " \
+  default_ttl="1m" \
+  max_ttl="2m"
 ```
 </details>
 
-Note additional application properties define the Vault backend and role
-Spring Cloud Vault needs to retrieve the username and password.
+<details>
+<summary><b>Verify</b></summary>
+Verify by generating credentials with the writer role:
 
-```java,nocopy
-spring.cloud.vault.database.role=writer
-spring.cloud.vault.database.backend=database
+```shell
+vault read database/creds/writer
 ```
 
-> [!IMPORTANT]
-> Vault itself does not signal to the application when the lease expires. Your
-> application must have a timer to identify when the old secret expires and proactively
-> request a new secret.
+```shell,nocopy
+Key                Value
+---                -----
+lease_id           database/creds/writer/x9fpwRltEqD4Gq45HZgPtU1i
+lease_duration     1m
+lease_renewable    true
+password           H-K3EPsHkXX0TAw1tHB2
+username           v-token-writer-SKafQcVrz91Lu3BDxeGi-1736435705
+```
+</details>
 
-Spring Cloud Vault supports tracking of lease expiration. As a result, you can configure
-additional application properties to tune its tracking such that it can properly retrieve
-a new set of credentials when the old ones expire. The `writer` role has a TTL of 1 minute,
-which may cause race conditions for applications renewing the secrets.
+Create a Vault role to read from the database
+===
 
-Note that application properties include configuration lifecycle parameters that control the minimum
-renewal period and expiration threshold for Spring Cloud Vault.
+Create a `reader` role for read-only access to the `payments` table.
+Set a longer TTL of 1 hour default and 24 hour maximum — suitable for humans
+querying the database to debug issues.
 
-```java,nocopy
-spring.cloud.vault.config.lifecycle.min-renewal=30s
-spring.cloud.vault.config.lifecycle.expiry-threshold=10s
+<details>
+<summary><b>Solution</b></summary>
+Run the following command in the <b>Terminal</b> tab.
+
+```shell
+vault write database/roles/reader \
+  db_name="payments-app" \
+  creation_statements="
+    CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+    GRANT CONNECT ON DATABASE payments TO \"{{name}}\";
+    GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+    GRANT SELECT ON TABLE public.payments TO \"{{name}}\";
+    GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO \"{{name}}\";
+  " \
+  default_ttl="1h" \
+  max_ttl="24h"
+```
+</details>
+
+<details>
+<summary><b>Verify</b></summary>
+Verify by generating credentials with the reader role and querying the database:
+
+```shell
+vault read database/creds/reader
 ```
 
-If your application needs short-lived credentials and may have errors due to renewal, tuning
-the configuration lifecycle parameters may help.
+```shell,nocopy
+Key                Value
+---                -----
+lease_id           database/creds/reader/SbwFzRsPeB3IcSi8ecyrMgjk
+lease_duration     1h
+lease_renewable    true
+password           YYkQlEhlaYg9oZ9p-pl6
+username           v-token-reader-vGcR3xsXCrCLPC5ALo33-1736436171
+```
 
-Next, add some code to refresh the database connection object in Spring Boot.
+Copy the username and password to query the `payments` table directly:
+
+```shell
+PGPASSWORD=<password> psql -h 10.5.0.3 -U <username> payments --command 'select * from payments;'
+```
+</details>
+
+Next, extend the Consul Template to render database credentials into the properties file.

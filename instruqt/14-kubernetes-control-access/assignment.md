@@ -1,78 +1,98 @@
 ---
-slug: encryption-configure-application
-id: zxpsdjpocwjd
+slug: kubernetes-control-access
+id: telxx0cohmpn
 type: challenge
-title: Encryption - Configure application
-teaser: Refactor the Spring application to encrypt the data in the database
+title: Kubernetes - Configure workload access to Vault
+teaser: Write a Vault policy and role that grants the payments-app service account access to secrets.
 notes:
 - type: text
-  contents: |-
-    There are two main libraries for Spring applications to make requests to Vault.
+  contents: |
+    Vault uses policies to define what paths a token can access and what operations
+    it can perform. A Kubernetes auth role links a policy to a specific service account
+    in a specific namespace.
 
-    1. Spring Vault - base library with interfaces to make requests to the Vault API.
-    1. Spring Cloud Vault - library integrating with Spring Cloud configuration to automatically
-       request secrets from Vault and inject them into application properties.
-
-    This workshop primarily focuses on using Spring Vault to interface
-    with Vault's transit secrets engine.
+    When the Vault Agent Injector injects a sidecar into a Pod, the injected agent
+    authenticates using the Pod's service account JWT and receives a token scoped
+    to the policy attached to that role.
 tabs:
-- id: d4g7yskwxlwt
+- id: rb0ty6vegzca
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: qxlogng4tn5d
+- id: n2sygooguwem
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
-difficulty: basic
-timelimit: 600
+  path: /root/workshop-vault-agent-devs
+difficulty: ""
+timelimit: 0
 enhanced_loading: null
 ---
 
-Spring Vault authenticates to Vault and accesses the `encrypt` and `decrypt` endpoints
-for a given key to encrypt and decrypt data in your application
-
-For more details, review: https://docs.spring.io/spring-vault/reference/vault/vault-secret-engines.html#vault.core.backends.transit
-
-You used the Vault CLI to encrypt and decrypt credit card numbers. Refactor the Spring application
-to encrypt the credit card before storing it in the database.
-
-Configure local authentication to Vault
+Add a policy to Vault
 ===
 
-Vault supports two types of authentication methods:
+Create a policy named `payments-app` that grants read access to the KV static secrets
+and the dynamic database credentials.
 
-1. Human user authentication - you log into Vault and get a token for subsequent requests
-2. Machine authentication - a service or machine logs into Vault and gets a token for subsequent requests
+<details>
+<summary><b>Solution</b></summary>
+Run the following command in the <b>Terminal</b> tab.
 
-You will test the application **locally** in this first section of the workshop.
-For local testing only, get a token from Vault and pass it as an environment
-variable to application properties.
+```shell
+vault policy write payments-app - <<EOF
+path "spring/kv/data/payments-app" {
+  capabilities = ["read"]
+}
 
-Open `src/main/resources/application.properties` in the **Code** tab.
+path "spring/kv/metadata/payments-app" {
+  capabilities = ["read"]
+}
 
-Check you have application properties to authenticate to Vault. Since you already use Spring Cloud Vault,
-Spring Vault (core library) has the correct information to authenticate to Vault using a local Vault token.
+path "database/creds/writer" {
+  capabilities = ["read"]
+}
 
-```java,nocopy
-spring.cloud.vault.uri=${VAULT_ADDR:http://127.0.0.1:8200}
-spring.cloud.vault.token=${VAULT_TOKEN}
+path "database/creds/reader" {
+  capabilities = ["read"]
+}
+EOF
 ```
+</details>
 
-Configure Spring to access transit secrets engine
+<details>
+<summary><b>Verify</b></summary>
+
+```shell
+vault policy read payments-app
+```
+</details>
+
+Link the policy to a Vault role
 ===
 
-Open `src/main/resources/application.properties` in the **Code** tab.
+Create a Vault Kubernetes auth role named `payments-app` that binds the policy to the
+`payments-app` service account in the `default` namespace.
 
-Spring Vault needs the path and key of the transit secrets engine.
-This application sets custom properties, `custom.transit.path` and `custom.transit.key`
-to define how the application should access the transit secrets engine.
+<details>
+<summary><b>Solution</b></summary>
+Run the following command in the <b>Terminal</b> tab.
 
-```java,nocopy
-custom.transit.path=transit
-custom.transit.key=payments
+```shell
+vault write auth/kubernetes/role/payments-app \
+  bound_service_account_names="payments-app" \
+  bound_service_account_namespaces="default" \
+  policies="payments-app" \
+  ttl="1h"
 ```
+</details>
 
-Next, create custom configuration properties to inject the transit secrets engine
-path and key into the code.
+<details>
+<summary><b>Verify</b></summary>
+
+```shell
+vault read auth/kubernetes/role/payments-app
+```
+</details>
+
+Next, add the Vault Agent Injector annotations to the Kubernetes Deployment.

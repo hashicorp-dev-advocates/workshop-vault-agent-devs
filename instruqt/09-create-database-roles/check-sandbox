@@ -1,8 +1,10 @@
 #!/bin/bash
 set -euxo pipefail
 
-set-workdir /root/workshop-spring-vault
+if ! vault read database/creds/writer > /dev/null 2>&1; then
+    fail-message "Set up a Vault \`writer\` role for the database"
+fi
 
-if ! grep "spring.cloud.vault.database.enabled=true" src/main/resources/application.properties; then
-    fail-message "Enable property for Spring application to read secrets from Vault"
+if ! vault read database/creds/reader > /dev/null 2>&1; then
+    fail-message "Set up a Vault \`reader\` role for the database"
 fi

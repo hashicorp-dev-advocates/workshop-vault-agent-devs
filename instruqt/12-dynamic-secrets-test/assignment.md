@@ -1,99 +1,121 @@
 ---
-slug: encryption-enable-transit-secrets-engine
-id: ccbwb6w4laye
+slug: dynamic-secrets-test
+id: p0dtsz6n6oyx
 type: challenge
-title: Encryption - Enable Vault's transit secrets engine
-teaser: Mount Vault's transit secrets engine to manage encryption keys for the application.
+title: Dynamic Secrets - Test application with Vault Agent
+teaser: Start the full stack and observe automatic credential rotation without a restart.
 notes:
 - type: text
-  contents: |
-    In this section of the workshop, you will learn how to use [Spring Vault](https://spring.io/projects/spring-vault)
-    to use an encryption key managed by HashiCorp Vault to encrypt and decrypt data in your database.
+  contents: |-
+    For more resources on using Vault Agent to inject secrets into applications, check out:
 
-    In this third section, you will:
-
-    1. Enable Vault's transit secrets engine.
-    2. Add an encryption key for an application.
-    3. Configure a Spring Boot application to use the encryption key to encrypt and decrypt data in a database.
-- type: text
-  contents: |
-    HashiCorp Vault stores and manages your secrets. It can handle two main types of secrets:
-
-    1. Static secrets - you manually write them into Vault as keys and values and handle their rotation.
-    2. Dynamic secrets - Vault automatically generates a secret with an expiration date. When the secret expires, Vault deletes it.
-
-    Vault can manage an existing encryption key as a static secret, although it has the transit secrets
-    engine to manage keys on your behalf.
-
-    Besides storing secrets, Vault supports different methods of authentication.
-
-    1. User authentication - Once Vault verifies your identity, it provides a token for future requests.
-    1. Machine authentication - Once Vault verifies a service or machine identity, it provides a token for future requests.
+    - [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent)
 tabs:
-- id: up0vecylxhoh
+- id: hthnhm5bea4c
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: jldvmacvuqc8
+- id: pcgkhatfza26
+  title: API Request
+  type: terminal
+  hostname: sandbox
+- id: qxqkml1jmrgq
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
+  path: /root/workshop-vault-agent-devs
 difficulty: ""
 timelimit: 0
 enhanced_loading: null
 ---
 
-In the previous section, recall that you accessed the database and got a list of credit card records.
-However, you noticed that the database stored credit card numbers in plaintext! This raises a potential security
-violation of personal and identifying information.
+Your application will do the following when it runs:
 
-```shell,nocopy
- id | user_id |        name         |  number  | expiry | cv3
-----+---------+---------------------+----------+--------+------
-  1 |     123 | Mr Nicholas Jackson | 12313434 | 01/23  | 1231
-(1 row)
-```
+1. Vault Agent authenticates to Vault and renders both static and dynamic credentials
+1. Spring Boot imports the rendered file — `spring.datasource.*` credentials come from Vault
+1. When the database lease approaches expiry, Vault Agent re-renders with fresh credentials
+1. Vault Agent calls `POST /actuator/refresh` — Spring tears down the old connection pool and reconnects
 
-Rather than store sensitive information in plaintext, you can encrypt the data using an encryption key.
-Applications that require access to the data use the key to decrypt the data for processing. Otherwise,
-any other user or service accessing the data will only get ciphertext.
-
-While you could store your encryption key as a static secret in Vault, you could also set up the
-Vault's transit secrets engine to manage encryption keys for you. Vault includes an API to handle
-encryption and decryption of the payload.
-
-This guide will walk you through configuring the transit secrets engine, generating a key
-for the application, and using the key in the application to encrypt and decrypt payloads.
-
-Enable the transit secrets engine
+Start Vault Agent
 ===
 
-Enable the transit secrets engine at the path `transit` in Vault
-with the `vault secrets enable <type>` command.
-You must mount secrets engines before Vault can issue secrets on your behalf.
-
-You can find the details in this documentation: https://developer.hashicorp.com/vault/docs/secrets/transit.
-
-> [!NOTE]
-> You need to enable the engine at the path `transit`.
-
-<details>
-<summary><b>Solution</b></summary>
-Run the following command in the <b>Terminal</b> tab.
+In the **Terminal** tab, start Vault Agent.
 
 ```shell
-vault secrets enable transit
+cd /root/workshop-vault-agent-devs
+docker compose up vault-agent
 ```
-</details>
 
-<details>
-<summary><b>Verify</b></summary>
-After mounting the secrets engine, verify that you've created the secrets engine using the following:
+You should see Vault Agent authenticate, request database credentials from the `writer` role,
+and render the secrets file.
+
+Run the application
+===
+
+In the **API Request** tab, start the Spring Boot application.
 
 ```shell
-vault secrets list
+cd /root/workshop-vault-agent-devs/spring/payments-app
+mvn spring-boot:run
 ```
-</details>
 
-After you've mounted the transit secrets engine, let's create a key for the Spring Boot application.
+When the application starts you will see both beans initialise with Vault-issued credentials:
+
+```shell,nocopy
+rebuild DataSource with username: v-token-writer-AbCdEfGh-1736449174
+rebuild ExampleClient with static-secret username: nic
+```
+
+Test the application
+===
+
+In the **API Request** tab, make a request to list payments.
+
+```shell
+curl localhost:8080/payments
+```
+
+```shell,nocopy
+[{"id":1,"reference":"REF001","amount":100.00,"currency":"USD","status":"PENDING","created_at":"..."}]
+```
+
+Make a request to create a new payment.
+
+```shell
+curl -s localhost:8080/payments \
+  -H "content-type: application/json" \
+  -d '{"reference":"REF999","amount":42.00,"currency":"USD","status":"PENDING"}'
+```
+
+Observe credential rotation
+===
+
+The `writer` role has a 1-minute TTL. After about one minute, watch the **Terminal** tab.
+Vault Agent will log a re-render and call `/actuator/refresh`:
+
+```shell,nocopy
+vault-agent  | [INFO] (runner) rendered "(dynamic)" -> "/secrets/vault-secrets.properties"
+```
+
+The application log will show the `DataSource` being rebuilt:
+
+```shell,nocopy
+rebuild DataSource with username: v-token-writer-XyZaBcDe-1736449274
+```
+
+Make a second request in the **API Request** tab to confirm the application keeps serving
+requests seamlessly with the new credentials.
+
+```shell
+curl localhost:8080/payments
+```
+
+Summary
+===
+
+In this section, you learned how to:
+
+1. Enable Vault's database secrets engine.
+2. Configure a database connection and create `writer` / `reader` roles.
+3. Extend the Consul Template to render dynamic database credentials.
+4. Add `@RefreshScope` to the `DataSource` bean to reconnect on credential rotation.

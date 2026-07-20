@@ -1,8 +1,12 @@
 #!/bin/bash
 set -euxo pipefail
 
-set-workdir /root/workshop-spring-vault
+set-workdir /root/workshop-vault-agent-devs
 
-if ! grep "vaultTransit.encrypt(request.number())" src/main/java/com/example/workshop_spring_vault/PaymentController.java; then
-    fail-message "Add VaultTransit encrypt method to PaymentController"
+if ! grep -q 'agent-inject-command-vault-secrets.properties' spring/kubernetes/deployment.yaml; then
+    fail-message "Add the \`vault.hashicorp.com/agent-inject-command-vault-secrets.properties\` annotation to \`deployment.yaml\`"
+fi
+
+if ! grep -q 'actuator/refresh' spring/kubernetes/deployment.yaml; then
+    fail-message "The command annotation must call \`/actuator/refresh\`"
 fi

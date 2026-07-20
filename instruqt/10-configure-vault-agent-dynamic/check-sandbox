@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euxo pipefail
 
-if [ "$(grep '@RefreshScope' src/main/java/com/example/workshop_spring_vault/WorkshopSpringVaultApplication.java | wc -l | tr -d ' ')" != "2" ]; then
-    fail-message "Add \`@RefreshScope\` to main file to refresh DataSource with new secrets"
+set-workdir /root/workshop-vault-agent-devs
+
+if ! grep -q 'database/creds/writer' spring/vault/secrets.ctmpl; then
+    fail-message "Add the \`database/creds/writer\` block to \`spring/vault/secrets.ctmpl\`"
+fi
+
+if ! grep -q 'spring.datasource.username' spring/vault/secrets.ctmpl; then
+    fail-message "Render \`spring.datasource.username\` from the database credentials block"
 fi

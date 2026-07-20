@@ -1,151 +1,75 @@
 ---
-slug: dynamic-secrets-create-roles
+slug: add-database-configuration
 id: nnttyhcupqmq
 type: challenge
-title: Dynamic Secrets - Create Vault roles to access database
-teaser: Set up roles in Vault to read from and write to the database
+title: Dynamic Secrets - Add database configuration
+teaser: Configure Vault's database secrets engine to connect to PostgreSQL.
 notes:
 - type: text
   contents: |-
-    Unlike static secrets and Vault's key-value secrets engine, you need
-    to attach a level of access to a secret managed by Vault.
+    Unlike static secrets, dynamic secrets require Vault to connect directly to
+    the target system so it can create and revoke credentials on your behalf.
 
-    You define and control the permissions a given database credential
-    has by defining a Vault role.
+    The database secrets engine needs a root connection to PostgreSQL — not for
+    the application to use, but for Vault itself to manage credentials.
 tabs:
-- id: 0ioahiydtmca
+- id: xi3yr6v3ymn1
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: 9tz9m4lmhgci
+- id: mfyd4xw5sxjy
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
+  path: /root/workshop-vault-agent-devs
 difficulty: ""
 timelimit: 0
 enhanced_loading: null
 ---
 
-A Vault role configures the permissions for the database user. When you create a role,
-you can specify the SQL statements that are executed to create the user and grant permissions.
-You can also specify the time-to-live (TTL) for the credentials.
+The database secrets engine requires connection information to PostgreSQL so it can
+create and revoke dynamic credentials on demand.
 
-Create a Vault role to write to the database
-===
+The connection URL uses Vault template placeholders for the root credentials:
 
-The application needs a Vault role with permissions to insert records into the `payment_card` table.
-The application does not create or drop tables. Thus, it needs a `writer` role to add records
-to the table.
-
-When you request Vault to generate database credentials, it runs a *creation statement*.
-This SQL statement defines how the database creates a username and password and attaches its
-permissions. It uses template variables to automatically pass in the `{{name}}` of the user,
-`{{password}}`, and `{{expiration}}` time.
-
-The role also sets a TTL, which limits the lifetime of the credential.
-Set the TTL for the writer to default to 1 minute, with a maximum of 2 minutes.
-This means that Vault allows one renewal of the existing credential before it deletes it permanently.
+```
+postgresql://{{username}}:{{password}}@hostname:port/database?sslmode=disable
+```
 
 > [!NOTE]
-> This TTL is for example purposes only. Do not set a short TTL in production, as it may
-> disrupt your application or Vault.
+> The `{{username}}` and `{{password}}` placeholders are Vault syntax — they are
+> substituted with the root credentials at runtime and never exposed to applications.
 
-<details>
-<summary><b>Solution</b></summary>
-Run the following command in the <b>Terminal</b> tab.
-
-```shell
-vault write database/roles/writer \
-    db_name=payments \
-    creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-    GRANT SELECT, INSERT, UPDATE ON payment_card TO \"{{name}}\";" \
-    default_ttl="1m" \
-    max_ttl="2m"
-```
-</details>
-
-<details>
-<summary><b>Verify</b></summary>
-After creating the writer role, verify that you can get some credentials with the following:
-
-```shell
-vault read database/creds/writer
-```
-
-The command outputs a username and password with a lease used by Vault to track the expiration
-of the secret.
-
-```shell,nocopy
-Key                Value
----                -----
-lease_id           database/creds/writer/x9fpwRltEqD4Gq45HZgPtU1i
-lease_duration     1m
-lease_renewable    true
-password           H-K3EPsHkXX0TAw1tHB2
-username           v-token-writer-SKafQcVrz91Lu3BDxeGi-1736435705
-```
-
-Create a Vault role to read from the database
+Configure the database connection
 ===
 
-Create a `reader` role that allows a human user to select records from the `payments` table.
+Configure the database secrets engine with a connection to the PostgreSQL database
+at `10.5.0.3:5432`. Use the `postgresql-database-plugin`, allow roles `writer` and `reader`,
+and set the root username and password to `postgres`.
 
-The permissions should grant select on the `payment_card` table,
-a default TTL of 1 hour, and a maximum of 24 hours. Since a user leverages
-the `reader` role to debug the database, it helps to have an longer TTL for the
-database credentials. Other parameters should match the `writer` role you created.
+You can find more details at: https://developer.hashicorp.com/vault/docs/secrets/databases/postgresql
 
 <details>
 <summary><b>Solution</b></summary>
 Run the following command in the <b>Terminal</b> tab.
 
 ```shell
-vault write database/roles/reader \
-    db_name=payments \
-    creation_statements="CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
-    GRANT SELECT ON payment_card TO \"{{name}}\";" \
-    default_ttl="1h" \
-    max_ttl="24h"
+vault write database/config/payments-app \
+  plugin_name="postgresql-database-plugin" \
+  connection_url="postgresql://{{username}}:{{password}}@10.5.0.3:5432/payments?sslmode=disable" \
+  allowed_roles="writer,reader" \
+  username="postgres" \
+  password="postgres"
 ```
 </details>
 
 <details>
 <summary><b>Verify</b></summary>
-After creating the reader role, verify that you can get some credentials with the following:
+After configuring the database, verify using the following:
 
 ```shell
-vault read database/creds/reader
-```
-
-The command outputs a username and password with a lease used by Vault to track the expiration
-of the secret.
-
-```shell,nocopy
-Key                Value
----                -----
-lease_id           database/creds/reader/SbwFzRsPeB3IcSi8ecyrMgjk
-lease_duration     1h
-lease_renewable    true
-password           YYkQlEhlaYg9oZ9p-pl6
-username           v-token-reader-vGcR3xsXCrCLPC5ALo33-1736436171
-```
-
-Copy the database username and password to log into Vault and select from the `payment_card`
-table.
-
-```shell
-PGPASSWORD=<copy from Vault output> psql -h 127.0.0.1 -U <copy from Vault output> payments --command 'select * from payment_card;'
-```
-
-The command outputs one record.
-
-```shell,nocopy
- id | user_id |        name         |  number  | expiry | cv3
-----+---------+---------------------+----------+--------+------
-  1 |     123 | Mr Nicholas Jackson | 12313434 | 01/23  | 1231
-(1 row)
+vault read database/config/payments-app
 ```
 </details>
 
-Next, configure the Spring application to read the database secret from Vault.
+Now configure roles that grant specific permissions for writing and reading from the database.

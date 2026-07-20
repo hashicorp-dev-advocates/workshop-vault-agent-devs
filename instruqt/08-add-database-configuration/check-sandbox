@@ -1,10 +1,14 @@
 #!/bin/bash
 set -euxo pipefail
 
-if ! vault read database/creds/writer; then
-    fail-message "Set up a Vault role to write to the database"
+if ! vault read database/config/payments-app > /dev/null 2>&1; then
+  fail-message "Configure the database connection at \`database/config/payments-app\`"
 fi
 
-if ! vault read database/creds/reader; then
-    fail-message "Set up a Vault role to write to the database"
+if [ "$( vault read -field=plugin_name database/config/payments-app )" != "postgresql-database-plugin" ]; then
+  fail-message "Use the \`postgresql-database-plugin\` plugin"
+fi
+
+if [ "$( vault read -field=allowed_roles database/config/payments-app )" != "[writer reader]" ]; then
+  fail-message "Set allowed roles to \`writer,reader\`"
 fi

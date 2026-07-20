@@ -1,3 +1,11 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-vault-agent-devs
+
+# Pre-populate deployment.yaml with all Vault Agent Injector annotations
+# EXCEPT the agent-inject-command annotation — that is what the participant adds.
+cat > spring/kubernetes/deployment.yaml << 'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,33 +23,11 @@ spec:
       labels:
         app: payments-app
       annotations:
-        # -----------------------------------------------------------------
-        # Vault Agent Injector annotations
-        #
-        # These annotations are read by the Vault Agent Injector webhook
-        # when this Pod is created. The injector automatically:
-        #   - Adds a vault-agent-init initContainer to render the secrets
-        #     file before the app container starts
-        #   - Adds a vault-agent sidecar container to keep leases renewed
-        #     and re-render the file when secrets rotate
-        # -----------------------------------------------------------------
-
-        # Enable injection for this Pod.
         vault.hashicorp.com/agent-inject: "true"
-
-        # Address of the external Vault server (running in docker-compose on
-        # the vpcbr network at fixed IP 10.5.0.2).
         vault.hashicorp.com/vault-addr: "http://10.5.0.2:8200"
-
-        # The Vault role to authenticate as.
         vault.hashicorp.com/role: "payments-app"
         vault.hashicorp.com/template-static-secret-render-interval: "1m"
-
-        # Tell the injector to inject a secret rendered to a file named
-        # "vault-secrets.properties" inside /vault/secrets/.
         vault.hashicorp.com/agent-inject-secret-vault-secrets.properties: "spring/kv/data/payments-app"
-
-        # Consul Template body — credentials only.
         vault.hashicorp.com/agent-inject-template-vault-secrets.properties: |
           {{- with secret "spring/kv/data/payments-app" }}
           custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
@@ -51,16 +37,9 @@ spec:
           spring.datasource.username={{ .Data.username }}
           spring.datasource.password={{ .Data.password }}
           {{- end }}
-
-        # TODO: Add the agent-inject-command annotation here so Vault Agent
-        # calls /actuator/refresh after every re-render (challenge 15).
-
-        # Revoke the dynamic DB lease when the Pod shuts down.
         vault.hashicorp.com/agent-revoke-on-shutdown: "true"
-
     spec:
       serviceAccountName: payments-app
-
       containers:
         - name: payments-app
           image: ghcr.io/hashicorp-dev-advocates/payments-app-spring:1.0.0-spring
@@ -84,3 +63,4 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 15
+EOF

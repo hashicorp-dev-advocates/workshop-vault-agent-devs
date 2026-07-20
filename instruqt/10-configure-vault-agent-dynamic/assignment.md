@@ -1,25 +1,26 @@
 ---
-slug: dynamic-secrets-inject-secret-into-application
+slug: configure-vault-agent-dynamic
 id: adltphxffu54
 type: challenge
-title: Dynamic Secrets - Inject secret into application
-teaser: Refactor the Spring application to inject the secret and refresh the application
-  when the secret changes.
+title: Dynamic Secrets - Extend Vault Agent template for database credentials
+teaser: Add the database/creds/writer block to secrets.ctmpl so Vault Agent renders dynamic credentials.
 notes:
 - type: text
   contents: |-
-    The username and password stored in Vault reference a custom application property `custom.StaticSecret`.
-    In general, Spring Boot recommends defining custom application properties using the `@ConfigurationProperties`
-    annotation instead of injecting them directly using `@Value`.
+    The Consul Template in `secrets.ctmpl` currently only renders static KV secrets.
+    To deliver dynamic database credentials, you need to add a second block that
+    calls the database secrets engine.
 
-    Injecting the secrets with a custom application property class ensures that any Java Bean using the
-    configuration can be refreshed.
+    Vault Agent will request a fresh set of credentials from the `database/creds/writer`
+    path, write them into the properties file, and re-render automatically before
+    the lease expires. Each render triggers `POST /actuator/refresh` so the application
+    reconnects to the database with the new credentials — without a restart.
 tabs:
 - id: gyvyksxbqaax
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
+  path: /root/workshop-vault-agent-devs
 - id: fnnqbxnxkjro
   title: Terminal
   type: terminal
@@ -29,156 +30,52 @@ timelimit: 0
 enhanced_loading: null
 ---
 
-Recall that Vault generates a database username and password to inject into `spring.datasource.username`
-and `spring.datasource.password` application properties. Use these application properties in your
-code to authenticate to the database and establish a connection.
+Open `spring/vault/secrets.ctmpl` in the **Code** tab.
 
-Inject username and password into a controller
+The template currently renders only the static KV secret:
+
+```hcl,nocopy
+{{ with secret "spring/kv/data/payments-app" -}}
+custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
+custom.static-secret.password={{ index .Data.data "custom.static-secret.password" }}
+{{ end -}}
+```
+
+Add the dynamic database credentials block
 ===
 
-Open `src/main/java/com/example/workshop_spring_vault/PaymentController.java` in the **Code** tab.
+Append a second `{{ with secret }}` block to request credentials from the `database/creds/writer`
+path and render them as `spring.datasource.username` and `spring.datasource.password`.
 
-This class defines an API endpoint that returns a list of payment cards. Spring Boot
-injects the `DataSource` to enable `JdbcClient` to connect to the database.
-
-```java,nocopy
-@Controller
-@ResponseBody
-class PaymentController {
-    private final JdbcClient db;
-    // omitted
-
-    PaymentController(DataSource dataSource,
-                      AppProperties appProperties, // omitted) {
-        this.db = JdbcClient.create(dataSource);
-        // omitted
-    }
-
-    // omitted
-}
+```hcl
+{{ with secret "database/creds/writer" -}}
+spring.datasource.username={{ .Data.username }}
+spring.datasource.password={{ .Data.password }}
+{{ end -}}
 ```
 
-Let's define the `DataSource` based on the datasource application properties.
-
-Refresh application when secret changes
-===
-
-Open `src/main/java/com/example/workshop_spring_vault/WorkshopSpringVaultApplication.java` in the **Code** tab.
-
-This main file defines an `DataSource` Bean that should be injected into the application.
-Note that the Bean returns a new `DataSource` once Spring Cloud Vault gets a new username and password
-from Vault and updates the properties.
-
-```java,nocopy
-// omitted
-@SpringBootApplication
-@EnableScheduling
-@EnableConfigurationProperties(AppProperties.class)
-public class WorkshopSpringVaultApplication {
-
-	private final Log log = LogFactory.getLog(getClass());
-
-	public static void main(String[] args) {
-		SpringApplication.run(WorkshopSpringVaultApplication.class, args);
-	}
-
-	@Bean
-	DataSource dataSource(DataSourceProperties properties) {
-		log.info("rebuild database secrets: " +
-				properties.getUsername() +
-				"," +
-				properties.getPassword()
-		);
-
-		return DataSourceBuilder
-				.create()
-				.url(properties.getUrl())
-				.username(properties.getUsername())
-				.password(properties.getPassword())
-				.build();
-	}
-
-	// omitted
-}
-```
-
-In order to properly support an application context refresh, you must completely rebuild
-any objects that reference the secret and define the object as a Bean. If you do not, the
-application will not identify the objects that require new secrets. Use the `@Bean` and
-[`@RefreshScope`](https://docs.spring.io/spring-cloud-commons/reference/spring-cloud-commons/application-context-services.html#refresh-scope)
-annotations to reload the object.
-
-The application needs to track when the secret expires. Once the application identifies
-that it needs a new database username and password, it can reload application context and
-retrieve a new set of credentials from Vault.
-
-Open `src/main/java/com/example/workshop_spring_vault/VaultRefresher.java` in the **Code** tab.
-
-This file includes a constructor called `VaultRefresher` that uses the Spring Vault library
-to add a lease listener. The lease listener checks if the secret lease will expire. If it does,
-then the application refreshes context and loads new database credentials from Vault.
-
-```java,nocopy
-    VaultRefresher(
-            SecretLeaseContainer leaseContainer,
-            ContextRefresher contextRefresher) {
-        final Log log = LogFactory.getLog(getClass());
-
-        this.contextRefresher = contextRefresher;
-
-        leaseContainer.addLeaseListener(event -> {
-            if (event instanceof SecretLeaseExpiredEvent) {
-                contextRefresher.refresh();
-                log.info("application refreshes database credentials");
-            }
-        });
-    }
-```
-
-Vault revokes the old credentials once they expire.
-
-Update `src/main/java/com/example/workshop_spring_vault/WorkshopSpringVaultApplication.java` in the **Code** tab.
-
-You will need to the `@RefreshScope` annotation to refresh the `DataSource` each time the properties change.
+- `.Data.username` and `.Data.password` are the Vault-generated credentials for the `writer` role
+- Unlike KV v2, database credentials are at the top level of `.Data` — no nested `data` key
+- Vault Agent holds the lease and re-renders before it expires, replacing the credentials in the file
 
 <details>
 <summary><b>Solution</b></summary>
-Add an annotation to refresh scope for the bean
-in the <b>Code</b> tab.
 
-```java
-// omitted
-@SpringBootApplication
-@EnableScheduling
-@EnableConfigurationProperties(AppProperties.class)
-public class WorkshopSpringVaultApplication {
+The complete `secrets.ctmpl`:
 
-    private final Log log = LogFactory.getLog(getClass());
+```hcl
+{{- /* spring/vault/secrets.ctmpl */ -}}
 
-    public static void main(String[] args) {
-        SpringApplication.run(WorkshopSpringVaultApplication.class, args);
-    }
+{{ with secret "spring/kv/data/payments-app" -}}
+custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
+custom.static-secret.password={{ index .Data.data "custom.static-secret.password" }}
+{{ end -}}
 
-    @Bean
-    @RefreshScope // add annotation to refresh this bean
-    DataSource dataSource(DataSourceProperties properties) {
-        log.info("rebuild database secrets: " +
-                properties.getUsername() +
-                "," +
-                properties.getPassword()
-        );
-
-        return DataSourceBuilder
-                .create()
-                .url(properties.getUrl())
-                .username(properties.getUsername())
-                .password(properties.getPassword())
-                .build();
-    }
-
-    // omitted
-}
+{{ with secret "database/creds/writer" -}}
+spring.datasource.username={{ .Data.username }}
+spring.datasource.password={{ .Data.password }}
+{{ end -}}
 ```
 </details>
 
-Next, test the application.
+Next, add `@RefreshScope` to the `DataSource` bean so it reconnects when the credentials rotate.

@@ -1,155 +1,128 @@
 ---
-slug: encryption-test-application
-id: ujkrvdtg848n
+slug: kubernetes-test
+id: ygcbounjkyms
 type: challenge
-title: Encryption - Test application
-teaser: Run the application that uses Vault to encrypt and decrypt customer data.
+title: Kubernetes - Deploy and test the application
+teaser: Apply the Kubernetes manifests and verify the Vault Agent Injector delivers secrets to the Pod.
 notes:
 - type: text
   contents: |-
-    For more resources on using Spring Vault to encrypt and decrypt data:
+    For other patterns for accessing Vault from Kubernetes, check out:
 
-    - [Tutorial](https://developer.hashicorp.com/vault/tutorials/encryption-as-a-service/eaas-spring-demo)
+    - [Vault Agent Injector tutorial](https://developer.hashicorp.com/vault/tutorials/kubernetes/agent-kubernetes)
+    - [Vault Secrets Operator](https://developer.hashicorp.com/vault/tutorials/integrate-kubernetes-hcp-vault-dedicated/kubernetes-vso-hcp-vault)
 tabs:
-- id: y16zkxj6fukx
+- id: kzeoijl53edq
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: nwsybv8cjjwe
+- id: ygcbounjkyms
   title: API Request
   type: terminal
   hostname: sandbox
-- id: 8ymzvlrpnwfm
+- id: at6rutnjiwqd
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
+  path: /root/workshop-vault-agent-devs
 difficulty: ""
 timelimit: 0
 enhanced_loading: null
 ---
 
-Your application will do the following when it runs:
-
-1. Authenticate to Vault using a token
-1. Inject the path to encryption key in Vault based on its custom configuration property
-1. Encrypt and decrypt a credit card number stored in a database using the key from Vault
-
-Configure local authentication to Vault
+Deploy the application
 ===
 
-You will test the application **locally** in this first section of the workshop.
-To run the application locally, you need to log into Vault and get a token.
-
-Use the username `dev` and password `password` to log into Vault and store the Vault token
-in the `VAULT_TOKEN` environment variable. This is a pre-defined environment variable
-that the Vault CLI uses to authenticate.
-
-Using the **Terminal** tab, log into Vault and store the token.
+Apply all Kubernetes manifests in the **Terminal** tab.
 
 ```shell
-export VAULT_TOKEN=$(vault login -method userpass -token-only username=dev password=password)
+kubectl apply -f spring/kubernetes/
 ```
 
-Recall that the application properties reference the Vault token in the `VAULT_TOKEN`
-environment variable.
+This creates the `payments-app` ServiceAccount, Deployment, and Service.
+The Vault Agent Injector webhook intercepts the Deployment and automatically adds:
 
-Run the application
+- An `initContainer` (`vault-agent-init`) that renders secrets before the app starts
+- A sidecar container (`vault-agent`) that keeps leases renewed and re-renders on rotation
+
+Check that the Pod starts successfully.
+
+```shell
+kubectl get pods -l app=payments-app
+```
+
+After a minute or two the pod should be running with two containers (app + vault-agent sidecar).
+
+```shell,nocopy
+NAME                           READY   STATUS    RESTARTS   AGE
+payments-app-6468f7c94b-p6zg9  2/2     Running   0          43s
+```
+
+Verify secret injection
 ===
 
-Run Maven to start the application in the **Terminal** tab.
+Check the application logs to confirm both beans initialised with Vault-issued credentials.
 
 ```shell
-./mvnw spring-boot:run
+kubectl logs -l app=payments-app -c payments-app
 ```
 
-When the Spring Boot application starts, it injects the static
-and database secrets.
+```shell,nocopy
+rebuild DataSource with username: v-kubernet-writer-AbCdEfGh-1736557753
+rebuild ExampleClient with static-secret username: nic
+```
 
-Create a new payment card record
+Test the application
 ===
 
-Make a request to the application to create a new payment card record in the **API Request** tab.
+The Service is exposed as a NodePort on port 30080. Make requests in the **API Request** tab.
+
+List payments:
 
 ```shell
-curl 127.0.0.1:8080/paymentcard  -H "content-type: application/json" \
-  -d '{
-        "user_id": 456,
-        "name": "Mr Nicholas Jackson",
-        "number": "456789012345",
-        "expiry":"01/26",
-        "cv3": "9081"
-      }'
+curl localhost:30080/payments
 ```
-
-The request returns a new payment card record with the credit card number in plaintext.
 
 ```shell,nocopy
-[{"id":2,"user_id":456,"name":"Mr Nicholas Jackson","number":"456789012345","expiry":"01/26","cv3":"9081"}]
+[{"id":1,"reference":"REF001","amount":100.00,"currency":"USD","status":"PENDING","created_at":"..."}]
 ```
 
-Verify encrypted credit card number in database
+Create a payment:
+
+```shell
+curl -s localhost:30080/payments \
+  -H "content-type: application/json" \
+  -d '{"reference":"REF-K8S","amount":99.00,"currency":"USD","status":"PENDING"}'
+```
+
+Verify credential rotation
 ===
 
-Get a database username and password from Vault to read from the database.
+Wait about one minute and watch the sidecar container logs for a re-render:
 
 ```shell
-vault read database/creds/reader
+kubectl logs -l app=payments-app -c vault-agent -f
 ```
 
-The command outputs a username and password for the database.
+After the `writer` role TTL expires, the sidecar re-renders the credentials file and calls
+`/actuator/refresh`. The application log will show:
 
 ```shell,nocopy
-Key                Value
----                -----
-lease_id           database/creds/reader/SbwFzRsPeB3IcSi8ecyrMgjk
-lease_duration     1h
-lease_renewable    true
-password           YYkQlEhlaYg9oZ9p-pl6
-username           v-token-reader-vGcR3xsXCrCLPC5ALo33-1736436171
+rebuild DataSource with username: v-kubernet-writer-XyZaBcDe-1736557854
 ```
 
-Copy the database username and password to log into Vault and select from the `payment_card`
-table.
+Make a second request to confirm the application is still serving traffic.
 
 ```shell
-PGPASSWORD=<copy from Vault output> psql -h 127.0.0.1 -U <copy from Vault output> payments --command 'select * from payment_card;'
+curl localhost:30080/payments
 ```
-
-The command outputs two records. The first record has its credit card number in plaintext as you used it
-before you implemented Vault transit secrets engine. The second record that you just created
-has a ciphertext credit card number.
-
-```shell,nocopy
- id | user_id |        name         |                                                                                                                                                                                                                                                                                                                                                        number                                                                                                                                                                                                                                                                                                                                                         | expiry | cv3
-----+---------+---------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------+------
-  1 |     123 | Mr Nicholas Jackson | 12313434                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | 01/23  | 1231
-  2 |     456 | Mr Nicholas Jackson | vault:v1:LH5Gfh1Meh1S19hSvBNKnnCnH+M7q9yrNCYLpzaAbLNjJCOiZQQbjDnXHrKaiQh0vUNtTWr/fDfpyW5AOBZApN2gXUL+5Mv0+oCINGjoCnNaTSX5ONMRNcnZXAAwOXOV3K6EjHJcYw98Ym8JaktnYAMx/et5zzZhnWMnJt+C21XLAlVixFTpRUm2ViK+AxOuZyzrOZVYR1Czo+kIRzYF7H7BozwiCytlXbgSoyuY7C4pHTIrO4JPIzLN3gpTumlQZY9hTSF0UvgqLelgI2wnBHsn5BwDtg1uFTNTEud+egbhaZiBUJ0vo2h+tsoeXnPdFsvvBYeKVlr66ASq3LvdaUpxX9bOItHRpy8jQdnpM9DEKD/DRSNLVPjZBrnaR3jPcfKVN4D2+hdcncawl0yMV1v701d0r6eRBtP9opoakFA4dgxN85sw/Mb51kPTxZqwtI4VhvZGRs2hsZL0YEP+B/hhZR4Yw/LTHxixFhVahxXg+MifycNlgnE2wUMAg+mY+98wceUHgbsxewf7iBzfss7oZWuFN5apUdUZelp0aMYRZEttLhKAfbAlll8dba+B+gElGX2LE+p/QEjra9IIOUy4nC6iWd/GXUerib6gykSFzybQ4q/nHssGOOdsqqBdLPbVLoQqJNC4UewH1QXuPGYHlCwCmGOwogUIFKED7M0= | 01/26  | 9081
-(2 rows)
-```
-
-Make a request to the API for the second payment card record.
-
-```shell
-curl 127.0.0.1:8080/paymentcard/2
-```
-
-The application uses Vault to decrypt the ciphertext and respond with the plaintext card number.
-
-```shell,nocopy
-[{"id":2,"user_id":456,"name":"Mr Nicholas Jackson","number":"456789012345","expiry":"01/26","cv3":"9081"}]
-```
-
-If an unauthorized user or service accesses the data in the database, they cannot decrypt and use
-the credit card number without sufficient access to decrypt the ciphertext using Vault. You can encrypt any
-previous records to store in the database or rekey records with a new key as needed.
 
 Summary
 ===
 
 In this section, you learned how to:
 
-1. Enable Vault's transit secrets engine.
-2. Add an encryption key for an application.
-3. Configure a Spring Boot application to use the encryption key to encrypt and decrypt data in a database.
-
+1. Enable Vault's Kubernetes authentication method.
+2. Create a Vault policy and role for the `payments-app` service account.
+3. Add the Vault Agent Injector annotations to inject and live-reload secrets in Kubernetes.
+4. Deploy and verify the application receives credentials from the Vault Agent sidecar.

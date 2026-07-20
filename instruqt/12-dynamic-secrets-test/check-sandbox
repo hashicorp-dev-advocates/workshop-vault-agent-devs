@@ -1,6 +1,18 @@
 #!/bin/bash
 set -euxo pipefail
 
-if [ "$( vault secrets list -format=json | jq 'has("transit/")' )" == "false" ]; then
-    fail-message "Enable a transit secrets engine at \`transit/\`"
+# Verify the rendered secrets file contains a dynamic datasource username
+# (written by Vault Agent from the database/creds/writer path)
+SECRETS_FILE="/root/workshop-vault-agent-devs/secrets/vault-secrets.properties"
+
+if [ ! -f "$SECRETS_FILE" ]; then
+    fail-message "Vault Agent has not yet rendered \`secrets/vault-secrets.properties\`. Start Vault Agent with \`docker compose up vault-agent\`."
+fi
+
+if ! grep -q "^spring.datasource.username=" "$SECRETS_FILE"; then
+    fail-message "The secrets file is missing \`spring.datasource.username\`. Make sure \`secrets.ctmpl\` includes the \`database/creds/writer\` block and Vault Agent has re-rendered the file."
+fi
+
+if ! grep -q "^spring.datasource.password=" "$SECRETS_FILE"; then
+    fail-message "The secrets file is missing \`spring.datasource.password\`. Make sure \`secrets.ctmpl\` includes the \`database/creds/writer\` block and Vault Agent has re-rendered the file."
 fi

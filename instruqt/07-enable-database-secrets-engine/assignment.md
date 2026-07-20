@@ -1,20 +1,32 @@
 ---
-slug: dynamic-secrets-add-database-configuration
+slug: enable-database-secrets-engine
 id: 6gqw5qnjbjay
 type: challenge
-title: Dynamic Secrets - Add database configuration
-teaser: Configure Vault's database secrets engine to issue usernames and passwords
+title: Dynamic Secrets - Enable Vault's database secrets engine
+teaser: Mount Vault's database secrets engine to generate short-lived PostgreSQL credentials.
 notes:
 - type: text
-  contents: |-
-    A secret is simply a collection of keys and values that are stored at a specific path.
+  contents: |
+    In this section of the workshop, you will learn how to use Vault Agent to
+    deliver dynamic database credentials to your Spring Boot application.
 
-    Vault has a number of secrets engines, which you mount at various API paths to store
-    and manage secrets.  You can write and read a secret from Vault.
+    In this section, you will:
 
-    Vault manages certain types of secrets, including database usernames and passwords.
-    When it detects a secret's lease expires, it deletes the credentials from the database
-    on your behalf.
+    1. Enable Vault's database secrets engine.
+    2. Add a database configuration for Vault to generate usernames and passwords on demand.
+    3. Create Vault roles that define permissions and TTLs for the generated credentials.
+    4. Extend the Consul Template to render dynamic credentials into the properties file.
+    5. Add `@RefreshScope` to the `DataSource` bean so it reconnects with fresh credentials.
+- type: text
+  contents: |
+    HashiCorp Vault stores and manages your secrets. It can handle two main types of secrets:
+
+    1. Static secrets - you manually write them into Vault as keys and values and handle their rotation.
+    2. Dynamic secrets - Vault automatically generates a secret with an expiration date. When the secret expires, Vault deletes it.
+
+    With dynamic secrets, Vault creates a unique username and password for each request.
+    When the lease expires, Vault automatically revokes the credentials from the database —
+    so stale credentials cannot accumulate even if a client crashes.
 tabs:
 - id: xi3yr6v3ymn1
   title: Terminal
@@ -24,87 +36,40 @@ tabs:
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
+  path: /root/workshop-vault-agent-devs
 difficulty: ""
 timelimit: 0
 enhanced_loading: null
 ---
 
-The database secrets engine requires connection information to the database.
+Dynamic secrets expire after a certain period of time. Vault deletes the credential on
+your behalf. The database secrets engine generates dynamic credentials (username and password)
+for a variety of databases including PostgreSQL, MySQL, and MongoDB.
 
-Connection information changes depending on the [database supported by Vault](https://developer.hashicorp.com/vault/docs/secrets/databases).
-
-When configuring the database secrets engine, you need to specify the plugin name,
-the connection URL, and the allowed roles.
-
-We will configure the database secrets engine for a PostgreSQL database.
-The connection URL has the format:
-
-```
-postgresql://{{username}}:{{password}}@hostname:port/database_name?sslmode=disable
-```
-
-The connection URL expects a root database `username` and `password` as template variables. To prevent
-leaking the root database username and password, pass the root database username and password
-as parameters.
-
-> [!NOTE]
-> It is highly recommended a user within the database is created specifically for Vault to use.
-> For simplicity of the exercise, we will use the default postgres administrator.
-
-Configure the database connection
+Enable the database secrets engine
 ===
 
-Configure the database secrets engine at `database/` with a connection
-to the PostgreSQL database at the DNS alias `database` and a database
-name of `payments`. The configuration should use the PostgreSQL database plugin
-and attach roles for a database `writer` and `reader`. Set the root database
-username to `postgres` and password to `payments`.
+Enable the database secrets engine at the path `database` in Vault.
+You must mount secrets engines before Vault can issue secrets on your behalf.
 
-You can find more details at: https://developer.hashicorp.com/vault/docs/secrets/databases/postgresql
+You can find the details in this documentation: https://developer.hashicorp.com/vault/docs/secrets/databases.
 
 <details>
 <summary><b>Solution</b></summary>
 Run the following command in the <b>Terminal</b> tab.
 
 ```shell
-vault write database/config/payments \
-    plugin_name=postgresql-database-plugin \
-    allowed_roles=writer,reader \
-    connection_url="postgresql://{{username}}:{{password}}@database:5432/payments?sslmode=disable" \
-    username="postgres" \
-    password="password"
+vault secrets enable database
 ```
 </details>
-
 
 <details>
 <summary><b>Verify</b></summary>
-After configuring the database, verify using the following:
+After mounting the secrets engine, verify that you've created the secrets engine using the following:
 
 ```shell
-vault read database/config/payments
+vault secrets list
 ```
 </details>
 
-Rotate the root database username and password
-===
-
-Once you pass the root database username and password in Vault,
-you cannot extract them by reading the database configuration from Vault.
-As a best practice, rotate the initial root database username and password
-to prevent a leak.
-
-Vault can automatically rotate the root database username and password for you.
-
-<details>
-<summary><b>Solution</b></summary>
-Run the following command in the <b>Terminal</b> tab.
-
-```shell
-vault write -force database/rotate-root/payments
-```
-</details>
-
-Now you configured Vault to connect to the database, let's create roles
-that grant specific permissions to write and read from the database.
+After you've mounted the database secrets engine, configure it to connect to the PostgreSQL database.

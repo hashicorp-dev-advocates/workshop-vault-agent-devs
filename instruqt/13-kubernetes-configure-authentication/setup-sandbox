@@ -1,0 +1,39 @@
+#!/bin/bash
+set -euxo pipefail
+
+set-workdir /root/workshop-vault-agent-devs
+
+export KUBECONFIG=/root/workshop-vault-agent-devs/tmp/kubeconfig.yaml
+
+# Wait for k3s to be ready
+until kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+  echo "Waiting for k3s..."
+  sleep 3
+done
+
+# Apply vault namespace and service account for Kubernetes auth
+kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -n vault -f vault/service-account.yaml
+
+# Configure Kubernetes auth method in Vault
+kubectl get secret -n vault vault-k8s-auth-secret -o jsonpath='{.data.token}' \
+  | base64 -d > tmp/k8s.token
+kubectl get secret -n vault vault-k8s-auth-secret -o jsonpath='{.data.ca\.crt}' \
+  | base64 -d > tmp/k8s.crt
+
+vault auth enable kubernetes || true
+
+vault write auth/kubernetes/config \
+  token_reviewer_jwt="$(cat tmp/k8s.token)" \
+  kubernetes_host="https://10.5.0.4:6443" \
+  kubernetes_ca_cert=@tmp/k8s.crt
+
+# Install the Vault Agent Injector (injector only, external Vault)
+helm upgrade --install vault-injector hashicorp/vault \
+  --version 0.34.0 \
+  --namespace vault \
+  --create-namespace \
+  --set server.enabled=false \
+  --set injector.enabled=true \
+  --set injector.externalVaultAddr=http://10.5.0.2:8200 \
+  --wait

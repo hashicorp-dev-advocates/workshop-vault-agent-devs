@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euxo pipefail
 
-if ! vault read transit/keys/payments; then
-    fail-message "Set up an encryption key for \`payments\`"
+if ! vault auth list -format=json | jq -e '."kubernetes/"' > /dev/null 2>&1; then
+    fail-message "Enable the Kubernetes auth method in Vault"
+fi
+
+if ! vault read auth/kubernetes/config > /dev/null 2>&1; then
+    fail-message "Configure the Kubernetes auth method with the cluster details"
 fi

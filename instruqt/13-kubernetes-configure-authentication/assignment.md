@@ -1,113 +1,84 @@
 ---
-slug: encryption-add-key
-id: hsho2azjqdfu
+slug: kubernetes-configure-authentication
+id: o1hfyvgix4wm
 type: challenge
-title: Encryption - Add an encryption key for the application
-teaser: Create an encryption key for the Spring Boot application managed by Vault's
-  transit secrets engine.
+title: Kubernetes - Enable Kubernetes authentication
+teaser: Enable Vault's Kubernetes authentication method so Pods can authenticate using their service account.
 notes:
 - type: text
-  contents: |-
-    When you create an encryption key in Vault, Vault has the ability to help rotate the key and rekey any
-    data with the new key.
+  contents: |
+    In this section of the workshop, you will learn how to deploy your application
+    to Kubernetes with the Vault Agent Injector.
+
+    In this section, you will:
+
+    1. Enable Vault's Kubernetes authentication method.
+    2. Create a Vault policy and role for the payments-app service account.
+    3. Add Vault Agent Injector annotations to the Kubernetes Deployment.
+    4. Deploy and verify the application runs with Vault-injected secrets.
+- type: text
+  contents: |
+    The Vault Agent Injector is a Kubernetes mutating admission webhook. When a Pod
+    is created with the right annotations, it automatically injects two containers:
+
+    1. **vault-agent-init** (initContainer) — authenticates to Vault, renders the
+       secrets file once, then exits. The app container only starts after this completes.
+    2. **vault-agent** (sidecar) — keeps leases renewed, re-renders when secrets
+       rotate, and calls `POST /actuator/refresh` on the app.
+
+    No `agent.hcl` file is needed — the injector builds the Vault Agent configuration
+    entirely from Pod annotations.
 tabs:
-- id: uox2brcwfaem
+- id: kvb7iyd26yyo
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: gekr9dddunyv
+- id: qoryfqxrqnuy
   title: Code
   type: code
   hostname: sandbox
-  path: /root/workshop-spring-vault
+  path: /root/workshop-vault-agent-devs
 difficulty: ""
 timelimit: 0
 enhanced_loading: null
 ---
 
-To encrypt and decrypt data using the transit secrets engine, you need to create
-an encryption key. You can create multiple keys for different purposes.
-There are also many different types of keys that you can create, such as
-AES, RSA, and ECDSA.
+In the previous sections, you tested your application locally using Vault Agent running as a
+Docker Compose service with token file authentication.
 
-In general, create a new key for each application that needs to encrypt data.
-This way, you can easily rotate the key without affecting other applications.
-Vault securely stores the keys. You cannot retrieve the key unless you
-configure the key with a parameter that allows export.
+When running in Kubernetes, the Vault Agent Injector uses the Pod's Kubernetes service account
+JWT to authenticate to Vault — no static token required. Vault verifies the JWT against the
+Kubernetes API and issues a scoped Vault token.
 
-Create a new encryption key
+Verify Kubernetes authentication method
 ===
 
-Using the Vault CLI, create a new RSA 4096 key in the **Terminal** tab.
-
-<details>
-<summary><b>Solution</b></summary>
-Run the following command in the <b>Terminal</b> tab.
+The `setup-sandbox` for this challenge has already configured the Kubernetes auth method and
+installed the Vault Agent Injector via Helm. Verify the configuration is in place.
 
 ```shell
-vault write -f transit/keys/payments type=rsa-4096
+vault read auth/kubernetes/config
 ```
-</details>
 
-<details>
-<summary><b>Verify</b></summary>
-After adding the secret, verify that you can read the key's attributes using the following:
+The output includes the Kubernetes API host, CA certificate, and token reviewer JWT.
+
+```shell,nocopy
+Key                        Value
+---                        -----
+kubernetes_host            https://10.5.0.4:6443
+token_reviewer_jwt_set     true
+...
+```
+
+Verify the Vault Agent Injector is running in the `vault` namespace.
 
 ```shell
-vault read transit/keys/payments
-```
-</details>
-
-Encrypt data
-===
-
-# Encrypt data with Vault
-
-Explore the Vault API by using it to encrypt data based on the key you generated.
-
-Run the following command to encrypt the
-credit card number in the **Terminal** tab.
-Note the `plaintext` parameter requires base64 encoded text.
-
-```shell
-vault write transit/encrypt/payments plaintext=$(base64 <<< "1234-5678-9012-3456")
+kubectl get pods -n vault
 ```
 
-The output will be a `ciphertext` value that you can store in your database.
-
-```shell
-Key            Value
----            -----
-ciphertext     vault:v1:fbcH6caYot7x1LN7r71GM4KQn7jx5kmUsjb/knr4zFveOXyvgbB25ShGqtPR9kawrQnXWgGNoZakUvwXLYcIKBLTEYbWYYWFWWc5MToGe35jXKQHqNbNc2av2Ccva4HH00abXqUwdhT35F/w4fLtBYtQK8L8towizb4OcdrB/tWUZXFC8P7gF+95hpAWSeGGttIoGo7yLQAat9jNlEH4S4ZN1Pl8JfehRrB6YQwg+BB0fn1gW1XNmF3wa54ZlGAJf+0Sy/CYROkALN1de9nC1ZG1T0c0S5rcJzRsmJ25NjvOU5GV2bfVBtbwzGWXsXzIeuKxioxe26ql6MUh4uiwaWbLAiugVWxva5CKdiBiY8gRW015rLSesr5hZwQvb8EJRH6E7182eJmJSzBhZFZzmAWUSfQjn50Gu2QvBPcP4A69TuNuUa3R5EJ8hX/Kv6ONCUy0IHoR5KDJ5wxpN9J6hOlRNvKfgkF3mQzgIkw7LjLigamtFCrfKzP3V1EGE9m1Dt9SflYmamb/kFyfWFk6PmN41TnTO7bvhDUmF4xreuXuQ+/6RZMgop0zJ3V7cgGJ4s76P0S/I6BKT3XB0k2Nk3wwAZAEE/HN63rii4uXC+L3jHWvJmZILexttBmfSUaWzwp8gawGiAxic7oWGLhr1b7zcUvaw7wl857yI3UgVKA=
-key_version    1
+```shell,nocopy
+NAME                                           READY   STATUS    RESTARTS   AGE
+vault-injector-agent-injector-...              1/1     Running   0          1m
 ```
 
-> [!NOTE]
-> The `ciphertext` value is probably going to be larger than the original credit card number, if
-> you have a size limit on the column you may need to increase it.
-
-Your application can use the same API path to encrypt a payload.
-
-Decrypt data with Vault
-===
-
-Use the `decrypt` endpoint to decrypt the payload. Rather than passing the `plaintext` property,
-you pass a `ciphertext` property.
-
-<details>
-<summary><b>Solution</b></summary>
-Run the following command in the <b>Terminal</b> tab.
-
-```shell
-vault write transit/decrypt/payments ciphertext=<ciphertext>
-```
-</details>
-
-If you base64-decode the value, you should see the original credit card number.
-
-```shell
-echo <plaintext> | base64 --decode
-```
-
-In this challenge, you learned how to encrypt and decrypt data using Vault's transit secrets engine.
-In the next challenge, a Spring Boot application will use Vault to encrypt and decrypt data in a database.
+Next, create a Vault policy and role to grant the `payments-app` service account access to secrets.
