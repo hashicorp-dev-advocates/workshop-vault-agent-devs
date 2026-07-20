@@ -49,6 +49,10 @@ export PATH=/opt/apache-maven-${MAVEN_VERSION}/bin:$PATH
 echo -e "\nPATH=\"/opt/apache-maven-${MAVEN_VERSION}/bin:\$PATH\"" >> ~/.profile
 rm -f apache-maven-${MAVEN_VERSION}-bin.tar.gz
 
+mvn -N wrapper:wrapper
+
+rm -f vault_${VAULT_VERSION}_linux_amd64.zip apache-maven-${MAVEN_VERSION}-bin.tar.gz jdk-${JDK_VERSION}_linux-x64_bin.deb mvnw mvnw.cmd
+
 # clone the workshop repository
 git clone https://github.com/hashicorp-dev-advocates/workshop-vault-agent-devs.git /root/workshop-vault-agent-devs
 
