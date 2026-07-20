@@ -45,6 +45,7 @@ services:
       - "127.0.0.1:8200:8200"
     volumes:
       - vault-logs:/vault/logs
+      - vault-file:/vault/file
     networks:
       vpcbr:
         ipv4_address: 10.5.0.2
@@ -225,6 +226,7 @@ services:
 volumes:
   postgres-data: {}
   vault-logs: {}
+  vault-file: {}
   k3s-server: {}
   k3s-agent: {}
 
