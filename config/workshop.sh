@@ -17,6 +17,63 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "==> Applying complete workshop solution from ${REPO_ROOT}"
 
 # -----------------------------------------------------------------------------
+# 0. Vault secrets engines and configuration
+#    vault/setup.sh (vault-init) only applies the policy and token so that
+#    the workshop challenges (01–02, 07–09) remain meaningful exercises.
+#    This block replays those challenge steps so the solve script produces a
+#    fully-wired environment in one pass.
+# -----------------------------------------------------------------------------
+export VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
+export VAULT_TOKEN="${VAULT_TOKEN:-root-token}"
+
+echo "  [0a] Enabling KV v2 secrets engine at spring/kv/ ..."
+vault secrets enable -path=spring/kv kv-v2 2>/dev/null || echo "       spring/kv already enabled, skipping."
+
+echo "  [0b] Writing static secrets to spring/kv/payments-app ..."
+vault kv put spring/kv/payments-app \
+  "custom.static-secret.username=nic" \
+  "custom.static-secret.password=${CUSTOM_SECRET}"
+
+echo "  [0c] Enabling database secrets engine ..."
+vault secrets enable database 2>/dev/null || echo "       database engine already enabled, skipping."
+
+echo "  [0d] Configuring PostgreSQL database plugin connection ..."
+vault write database/config/payments-app \
+  plugin_name="postgresql-database-plugin" \
+  connection_url="postgresql://{{username}}:{{password}}@10.5.0.3:5432/payments?sslmode=disable" \
+  allowed_roles="writer,reader" \
+  username="postgres" \
+  password="${PG_PASSWORD}"
+
+echo "  [0e] Creating writer database role ..."
+vault write database/roles/writer \
+  db_name="payments-app" \
+  creation_statements="
+    CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+    GRANT CONNECT ON DATABASE payments TO \"{{name}}\";
+    GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.payments TO \"{{name}}\";
+    GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO \"{{name}}\";
+  " \
+  default_ttl="1m" \
+  max_ttl="2m"
+
+echo "  [0f] Creating reader database role ..."
+vault write database/roles/reader \
+  db_name="payments-app" \
+  creation_statements="
+    CREATE ROLE \"{{name}}\" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}';
+    GRANT CONNECT ON DATABASE payments TO \"{{name}}\";
+    GRANT USAGE ON SCHEMA public TO \"{{name}}\";
+    GRANT SELECT ON TABLE public.payments TO \"{{name}}\";
+    GRANT USAGE, SELECT ON SEQUENCE public.payments_id_seq TO \"{{name}}\";
+  " \
+  default_ttl="1h" \
+  max_ttl="24h"
+
+echo "    configured Vault secrets engines and database roles"
+
+# -----------------------------------------------------------------------------
 # 1. spring/vault/agent.hcl
 #    Adds template_config and template blocks to the existing vault{} + auto_auth{}
 #    skeleton. This is the output of challenges 03 (static) and 10 (dynamic).

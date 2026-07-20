@@ -58,6 +58,10 @@ with the updated `custom.static-secret.*` property values.
 <summary><b>Solution</b></summary>
 
 ```java
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+
+// omitted for clarity
+
 @Bean
 @RefreshScope
 ExampleClient exampleClient(AppProperties properties) {

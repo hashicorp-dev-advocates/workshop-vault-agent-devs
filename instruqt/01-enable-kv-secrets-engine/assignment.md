@@ -7,8 +7,10 @@ teaser: Mount Vault's key-value secrets engine to store static secrets.
 notes:
 - type: text
   contents: |
-    In this section of the workshop, you will learn how to use Vault Agent to
+    In this section of the workshop, you will learn how to use [Vault Agent](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent) to
     inject static secrets into your Spring Boot application — without any Vault SDK.
+    As a Vault-agnostic pattern, this approach minimizes the refactoring required for
+    an application and decouples the dependency between the application and Vault.
 
     In this first section, you will:
 

@@ -19,6 +19,8 @@ notes:
     Adding the command annotation tells Vault Agent to call `POST /actuator/refresh`
     after every successful render, triggering Spring Cloud Context to rebuild all
     `@RefreshScope` beans with the new property values.
+
+    For more on pod annotations, review the [Vault Agent Injector documentation](https://developer.hashicorp.com/vault/docs/deploy/kubernetes/injector/annotations).
 tabs:
 - id: lzdtg5o0xyyv
   title: Code

@@ -61,6 +61,7 @@ Expose the refresh actuator endpoint
 ===
 
 3. Change `management.endpoints.web.exposure.include` to expose the `refresh` endpoint in addition to `health`.
+   Spring actuator includes a refresh endpoint that refreshes application context on demand.
 
 ```properties
 management.endpoints.web.exposure.include=refresh,health
@@ -75,11 +76,11 @@ exposed, the live-reload command in `agent.hcl` will fail silently.
 ```properties
 spring.application.name=payments-app
 
+spring.datasource.url=jdbc:postgresql://postgres:5432/payments
+
 spring.config.import=file:/vault/secrets/vault-secrets.properties
 
 management.endpoints.web.exposure.include=refresh,health
-
-spring.datasource.url=jdbc:postgresql://postgres:5432/payments
 ```
 </details>
 

@@ -43,7 +43,7 @@ enhanced_loading: null
 ---
 
 Dynamic secrets expire after a certain period of time. Vault deletes the credential on
-your behalf. The database secrets engine generates dynamic credentials (username and password)
+your behalf. The [database secrets engine](https://developer.hashicorp.com/vault/docs/secrets/databases) generates dynamic credentials (username and password)
 for a variety of databases including PostgreSQL, MySQL, and MongoDB.
 
 Enable the database secrets engine

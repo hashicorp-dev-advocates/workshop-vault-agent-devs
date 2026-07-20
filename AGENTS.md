@@ -35,7 +35,7 @@ For local work, use `podman compose`. Instruqt runs the same file with an older
 |---------|----------|------|
 | `vault` | 10.5.0.2 | HashiCorp Vault 1.21.4, dev mode, token `root-token` |
 | `database` | 10.5.0.3 | PostgreSQL 16, database `payments` |
-| `vault-init` | 10.5.0.6 | One-shot: runs `vault/setup.sh` to configure secrets engines + policy |
+| `vault-init` | 10.5.0.6 | One-shot: runs `vault/setup.sh` to apply the policy and create the agent token (secrets engines are configured by workshop participants) |
 | `vault-agent` | 10.5.0.7 | Renders `vault-secrets.properties`; calls `/actuator/refresh` on change |
 | `payments-app` | 10.5.0.8 | Spring Boot app (Docker Compose variant), port 8080 |
 | `server` | 10.5.0.4 | k3s server node; writes kubeconfig to `./tmp/kubeconfig.yaml` |
@@ -120,7 +120,11 @@ configuration that participants build up challenge by challenge:
 ### Workshop solve script
 
 `config/workshop.sh` applies the **complete working configuration** in one step — use it
-to skip ahead or verify the final state. It writes all five files above as heredocs.
+to skip ahead or verify the final state. It:
+
+1. Configures the Vault secrets engines (KV v2 at `spring/kv/`, database engine with
+   PostgreSQL connection and writer/reader roles) that participants set up in challenges 01–09.
+2. Writes all five source files listed above as heredocs.
 
 ```bash
 bash config/workshop.sh

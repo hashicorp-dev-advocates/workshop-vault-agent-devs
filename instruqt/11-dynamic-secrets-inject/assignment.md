@@ -69,6 +69,10 @@ When Vault Agent re-renders the secrets file with new database credentials and c
 <summary><b>Solution</b></summary>
 
 ```java
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+
+// omitted for clarity
+
 @Bean
 @RefreshScope
 DataSource dataSource(DataSourceProperties properties) {

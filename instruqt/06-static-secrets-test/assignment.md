@@ -7,10 +7,7 @@ teaser: Start Vault Agent and the application, then test live secret reload.
 notes:
 - type: text
   contents: |-
-    For more resources on using Vault Agent to inject secrets into applications, check out:
-
-    - [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent)
-    - [Tutorial: Vault Agent with Spring Boot](https://developer.hashicorp.com/vault/tutorials/app-integration/spring-reload-secrets)
+    For more resources on using Vault Agent to inject secrets into applications, check out the [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
 tabs:
 - id: tmnosluxyr8b
   title: Terminal
@@ -46,7 +43,7 @@ Vault Agent will authenticate, render the secrets file, and then watch for chang
 
 ```shell
 cd /root/workshop-vault-agent-devs
-docker-compose up vault-agent
+K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up vault-agent
 ```
 
 You should see Vault Agent render the secrets file and log something like:
