@@ -3,7 +3,8 @@ slug: dynamic-secrets-inject
 id: 7odwo6jz69eh
 type: challenge
 title: Dynamic Secrets - Add @RefreshScope to reload the DataSource
-teaser: Annotate the DataSource bean so it reconnects with fresh credentials when the lease rotates.
+teaser: Annotate the DataSource bean so it reconnects with fresh credentials when
+  the lease rotates.
 notes:
 - type: text
   contents: |-
@@ -15,12 +16,12 @@ notes:
     Without it, the application keeps using the original credentials until they
     expire — at which point every database query will fail.
 tabs:
-- id: gyvyksxbqaax
+- id: jmr6pyfmo507
   title: Code
   type: code
   hostname: sandbox
   path: /root/workshop-vault-agent-devs
-- id: fnnqbxnxkjro
+- id: dfing64x1m01
   title: Terminal
   type: terminal
   hostname: sandbox

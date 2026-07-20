@@ -20,7 +20,7 @@ tabs:
   title: API Request
   type: terminal
   hostname: sandbox
-- id: x3kqpwerty12
+- id: e5yxjpnbfvsp
   title: Code
   type: code
   hostname: sandbox
@@ -46,7 +46,7 @@ Vault Agent will authenticate, render the secrets file, and then watch for chang
 
 ```shell
 cd /root/workshop-vault-agent-devs
-docker compose up vault-agent
+docker-compose up vault-agent
 ```
 
 You should see Vault Agent render the secrets file and log something like:

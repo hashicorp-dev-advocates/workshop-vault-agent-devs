@@ -3,7 +3,8 @@ slug: kubernetes-configure-authentication
 id: o1hfyvgix4wm
 type: challenge
 title: Kubernetes - Enable Kubernetes authentication
-teaser: Enable Vault's Kubernetes authentication method so Pods can authenticate using their service account.
+teaser: Enable Vault's Kubernetes authentication method so Pods can authenticate using
+  their service account.
 notes:
 - type: text
   contents: |

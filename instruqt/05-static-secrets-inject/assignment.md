@@ -3,7 +3,8 @@ slug: static-secrets-inject
 id: 5v8isniood5z
 type: challenge
 title: Static Secrets - Add @RefreshScope to reload the secret
-teaser: Annotate the ExampleClient bean so it reloads when Vault Agent triggers a refresh.
+teaser: Annotate the ExampleClient bean so it reloads when Vault Agent triggers a
+  refresh.
 notes:
 - type: text
   contents: |-
@@ -15,12 +16,12 @@ notes:
     even if the underlying properties file changes. The application would continue using
     stale credentials until it restarts.
 tabs:
-- id: gatd4ky51iw3
+- id: to5ktzq6sls8
   title: Code
   type: code
   hostname: sandbox
   path: /root/workshop-vault-agent-devs
-- id: rt2s99bix2re
+- id: hvwo40xahhho
   title: Terminal
   type: terminal
   hostname: sandbox

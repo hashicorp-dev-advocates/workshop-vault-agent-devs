@@ -3,7 +3,8 @@ slug: kubernetes-control-access
 id: telxx0cohmpn
 type: challenge
 title: Kubernetes - Configure workload access to Vault
-teaser: Write a Vault policy and role that grants the payments-app service account access to secrets.
+teaser: Write a Vault policy and role that grants the payments-app service account
+  access to secrets.
 notes:
 - type: text
   contents: |

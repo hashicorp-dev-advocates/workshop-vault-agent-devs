@@ -28,7 +28,6 @@ notes:
 
     1. User authentication - Once Vault verifies your identity, it provides a token for future requests.
     1. Machine authentication - Once Vault verifies a service or machine identity, it provides a token for future requests.
-
 tabs:
 - id: qzeuvymabeea
   title: Terminal

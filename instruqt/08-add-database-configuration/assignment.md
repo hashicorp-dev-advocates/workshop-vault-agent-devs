@@ -13,11 +13,11 @@ notes:
     The database secrets engine needs a root connection to PostgreSQL — not for
     the application to use, but for Vault itself to manage credentials.
 tabs:
-- id: xi3yr6v3ymn1
+- id: cfajdqfnbgix
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: mfyd4xw5sxjy
+- id: vxb3pletflzq
   title: Code
   type: code
   hostname: sandbox

@@ -1,9 +1,10 @@
 ---
 slug: kubernetes-test
-id: ygcbounjkyms
+id: 3yfjmyhposeu
 type: challenge
 title: Kubernetes - Deploy and test the application
-teaser: Apply the Kubernetes manifests and verify the Vault Agent Injector delivers secrets to the Pod.
+teaser: Apply the Kubernetes manifests and verify the Vault Agent Injector delivers
+  secrets to the Pod.
 notes:
 - type: text
   contents: |-
@@ -12,15 +13,15 @@ notes:
     - [Vault Agent Injector tutorial](https://developer.hashicorp.com/vault/tutorials/kubernetes/agent-kubernetes)
     - [Vault Secrets Operator](https://developer.hashicorp.com/vault/tutorials/integrate-kubernetes-hcp-vault-dedicated/kubernetes-vso-hcp-vault)
 tabs:
-- id: kzeoijl53edq
+- id: c1vl4yfr8mrf
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: ygcbounjkyms
+- id: rnq4xdvlxa6y
   title: API Request
   type: terminal
   hostname: sandbox
-- id: at6rutnjiwqd
+- id: uc2890xtndlw
   title: Code
   type: code
   hostname: sandbox

@@ -3,7 +3,8 @@ slug: create-database-roles
 id: 9l1byqbc0krz
 type: challenge
 title: Dynamic Secrets - Create Vault roles to access database
-teaser: Define writer and reader roles that control the permissions and TTL of generated credentials.
+teaser: Define writer and reader roles that control the permissions and TTL of generated
+  credentials.
 notes:
 - type: text
   contents: |-
@@ -15,11 +16,11 @@ notes:
     it renews leases, re-renders the template with fresh credentials, and triggers
     `POST /actuator/refresh` so the application reconnects without a restart.
 tabs:
-- id: 0ioahiydtmca
+- id: dpihlax48h9p
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: 9tz9m4lmhgci
+- id: tn0kkehqk4xi
   title: Code
   type: code
   hostname: sandbox

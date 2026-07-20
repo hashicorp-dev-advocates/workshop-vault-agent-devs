@@ -3,7 +3,8 @@ slug: configure-vault-agent-dynamic
 id: adltphxffu54
 type: challenge
 title: Dynamic Secrets - Extend Vault Agent template for database credentials
-teaser: Add the database/creds/writer block to secrets.ctmpl so Vault Agent renders dynamic credentials.
+teaser: Add the database/creds/writer block to secrets.ctmpl so Vault Agent renders
+  dynamic credentials.
 notes:
 - type: text
   contents: |-

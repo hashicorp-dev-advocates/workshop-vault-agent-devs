@@ -1,9 +1,10 @@
 ---
 slug: kubernetes-inject-annotations
-id: at6rutnjiwqd
+id: pnxxkphztgrq
 type: challenge
 title: Kubernetes - Add the live-reload annotation
-teaser: Add the agent-inject-command annotation so Vault Agent triggers Spring Boot to reload secrets.
+teaser: Add the agent-inject-command annotation so Vault Agent triggers Spring Boot
+  to reload secrets.
 notes:
 - type: text
   contents: |
@@ -19,12 +20,12 @@ notes:
     after every successful render, triggering Spring Cloud Context to rebuild all
     `@RefreshScope` beans with the new property values.
 tabs:
-- id: at6rutnjiwqd
+- id: lzdtg5o0xyyv
   title: Code
   type: code
   hostname: sandbox
   path: /root/workshop-vault-agent-devs
-- id: kzeoijl53edq
+- id: ne4w0q6x0jjd
   title: Terminal
   type: terminal
   hostname: sandbox

@@ -3,7 +3,8 @@ slug: configure-vault-agent
 id: p81sptnusjqf
 type: challenge
 title: Static Secrets - Configure Vault Agent
-teaser: Author the Vault Agent configuration to authenticate to Vault and render secrets into a file.
+teaser: Author the Vault Agent configuration to authenticate to Vault and render secrets
+  into a file.
 notes:
 - type: text
   contents: |-

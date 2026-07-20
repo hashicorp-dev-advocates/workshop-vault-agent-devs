@@ -11,15 +11,15 @@ notes:
 
     - [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent)
 tabs:
-- id: hthnhm5bea4c
+- id: xfd9dizuscit
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: pcgkhatfza26
+- id: tc4fbseyo7sw
   title: API Request
   type: terminal
   hostname: sandbox
-- id: qxqkml1jmrgq
+- id: urpqdzfvtp74
   title: Code
   type: code
   hostname: sandbox
@@ -43,7 +43,7 @@ In the **Terminal** tab, start Vault Agent.
 
 ```shell
 cd /root/workshop-vault-agent-devs
-docker compose up vault-agent
+docker-compose up vault-agent
 ```
 
 You should see Vault Agent authenticate, request database credentials from the `writer` role,
