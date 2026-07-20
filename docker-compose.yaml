@@ -95,6 +95,8 @@ services:
     volumes:
       - ./vault:/vault:ro
       - ./secrets:/secrets
+      - vault-init-logs:/vault/logs
+      - vault-init-file:/vault/file
     entrypoint: ["sh", "/vault/setup.sh"]
     restart: "no"
     networks:
@@ -120,6 +122,8 @@ services:
     volumes:
       - ./spring/vault:/spring/vault:ro
       - ./secrets:/secrets
+      - vault-agent-logs:/vault/logs
+      - vault-agent-file:/vault/file
     entrypoint:
       - sh
       - -ec
@@ -227,6 +231,10 @@ volumes:
   postgres-data: {}
   vault-logs: {}
   vault-file: {}
+  vault-init-logs: {}
+  vault-init-file: {}
+  vault-agent-logs: {}
+  vault-agent-file: {}
   k3s-server: {}
   k3s-agent: {}
 
