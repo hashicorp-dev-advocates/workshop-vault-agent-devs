@@ -49,8 +49,6 @@ export PATH=/opt/apache-maven-${MAVEN_VERSION}/bin:$PATH
 echo -e "\nPATH=\"/opt/apache-maven-${MAVEN_VERSION}/bin:\$PATH\"" >> ~/.profile
 rm -f apache-maven-${MAVEN_VERSION}-bin.tar.gz
 
-mvn -N wrapper:wrapper
-
 rm -f vault_${VAULT_VERSION}_linux_amd64.zip apache-maven-${MAVEN_VERSION}-bin.tar.gz jdk-${JDK_VERSION}_linux-x64_bin.deb mvnw mvnw.cmd
 
 # clone the workshop repository
@@ -80,3 +78,5 @@ K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up -d vault database vault-init 
 # add the HashiCorp Helm chart repo for the Kubernetes section
 helm repo add hashicorp https://helm.releases.hashicorp.com
 helm repo update
+
+source ~/.profile
