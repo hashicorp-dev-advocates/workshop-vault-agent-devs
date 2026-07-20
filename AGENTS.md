@@ -22,6 +22,15 @@ Kubernetes variant deploys the app into an in-compose k3s cluster with the Vault
 
 ### docker-compose.yaml service overview
 
+For local work, use `podman compose`. Instruqt runs the same file with an older
+`docker-compose`, so service dependencies must stay compatible with
+`service_started` and `service_healthy` conditions only.
+
+`vault-agent` is compatible with older `docker-compose` implementations that only accept
+`depends_on` conditions `service_started` and `service_healthy`: it waits for
+`secrets/vault-token` in its entrypoint instead of relying on
+`service_completed_successfully` from `vault-init`.
+
 | Service | Fixed IP | Role |
 |---------|----------|------|
 | `vault` | 10.5.0.2 | HashiCorp Vault 1.21.4, dev mode, token `root-token` |
@@ -89,7 +98,8 @@ Builds and publishes `ghcr.io/<owner>/payments-app-spring` to GitHub Container R
 
 ## Conventions
 
-- Container runtime: **Podman** (not Docker). Use `podman compose` and `podman build`.
+- Local testing runtime: **Podman**. Use `podman compose` and `podman build` for local development and validation.
+- Instruqt uses an older `docker-compose`; keep [`docker-compose.yaml`](docker-compose.yaml) compatible with compose features limited to `service_started` and `service_healthy` dependency conditions.
 - Tests skip during image build (`-DskipTests`) because they require a live database and
   secrets file.
 - Secrets are never hardcoded. All credentials come from Vault Agent at runtime.

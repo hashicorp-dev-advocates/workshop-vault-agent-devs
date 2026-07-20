@@ -71,7 +71,7 @@ uuidgen > ./tmp/k3s.token
 # vault-agent and payments-app are intentionally excluded:
 #   vault-agent  — participants start this manually in a Terminal tab
 #   payments-app — participants run this locally via ./mvnw spring-boot:run
-K3S_TOKEN=$(cat ./tmp/k3s.token) docker compose up -d vault database vault-init server agent
+K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up -d vault database vault-init server agent
 
 # add the HashiCorp Helm chart repo for the Kubernetes section
 helm repo add hashicorp https://helm.releases.hashicorp.com

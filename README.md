@@ -87,8 +87,8 @@ docker-compose.yaml       Full tutorial stack (vault, postgres, vault-init, vaul
 
 ### Prerequisites
 
-- [Podman](https://podman.io) 5+ (macOS: `brew install podman`)  
-  Podman uses `docker-compose` as its external compose provider — no Docker Desktop needed.
+- [Podman](https://podman.io) 5+ (macOS: `brew install podman`) for local testing
+- Instruqt runs the same [`docker-compose.yaml`](docker-compose.yaml) with an older `docker-compose`, so compose features must remain compatible with `service_started` and `service_healthy` dependency conditions only.
 
 ### First-time setup
 
@@ -105,11 +105,14 @@ chmod 777 secrets/
 podman compose up
 ```
 
-Services start in strict dependency order:
+Services start in dependency order:
 
 ```
-postgres ──healthy──▶ vault ──healthy──▶ vault-init ──completed──▶ vault-agent ──healthy──▶ payments-app
+postgres ──healthy──▶ vault ──healthy──▶ vault-init ──started──▶ vault-agent ──healthy──▶ payments-app
 ```
+
+On older `docker-compose` releases, `vault-agent` cannot use `depends_on.condition: service_completed_successfully`.
+Instead it waits for `secrets/vault-token` before starting Vault Agent, which preserves the same effective startup behavior.
 
 `payments-app` will not start until Vault Agent has rendered `secrets/vault-secrets.properties`.
 If the file is absent at startup the app fast-fails on `spring.config.import` — this is

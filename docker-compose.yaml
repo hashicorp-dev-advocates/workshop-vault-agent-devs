@@ -107,7 +107,8 @@ services:
   # vault-agent
   # Runs Vault Agent in daemon mode. Renders secrets.ctmpl to
   # /secrets/vault-secrets.properties and calls /actuator/refresh after each
-  # re-render. Healthcheck confirms the file exists before payments-app starts.
+  # re-render. Depends on Vault and Postgres health so it can start on older
+  # docker-compose versions that do not support service_completed_successfully.
   # ---------------------------------------------------------------------------
   vault-agent:
     image: hashicorp/vault:1.21.4
@@ -116,13 +117,24 @@ services:
     volumes:
       - ./spring/vault:/spring/vault:ro
       - ./secrets:/secrets
-    entrypoint: ["vault", "agent", "-config=/spring/vault/agent.hcl"]
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        until [ -f /secrets/vault-token ]; do
+          sleep 1
+        done
+        exec vault agent -config=/spring/vault/agent.hcl
     networks:
       vpcbr:
         ipv4_address: 10.5.0.7
     depends_on:
+      vault:
+        condition: service_healthy
+      database:
+        condition: service_healthy
       vault-init:
-        condition: service_completed_successfully
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "test -f /secrets/vault-secrets.properties"]
       interval: 5s
