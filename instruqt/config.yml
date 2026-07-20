@@ -1,7 +1,7 @@
 version: "3"
 virtualmachines:
 - name: sandbox
-  image: instruqt/docker-2010
+  image: instruqt/docker-28-3
   shell: bash
   environment:
     KUBECONFIG: /root/workshop-vault-agent-devs/tmp/kubeconfig.yaml
