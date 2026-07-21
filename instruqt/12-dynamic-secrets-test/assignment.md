@@ -13,6 +13,11 @@ tabs:
   title: Terminal
   type: terminal
   hostname: sandbox
+- id: hbinlrbtmwqg
+  title: Maven
+  type: terminal
+  hostname: sandbox
+  workdir: /root/workshop-vault-agent-devs/spring/payments-app
 - id: tc4fbseyo7sw
   title: API Request
   type: terminal
@@ -50,11 +55,11 @@ and render the secrets file.
 Run the application
 ===
 
-In the **API Request** tab, start the Spring Boot application.
+In the **Maven** tab, start the Spring Boot application.
 
 ```shell
 cd /root/workshop-vault-agent-devs/spring/payments-app
-mvn spring-boot:run
+SPRING_CONFIG_IMPORT="file:/root/workshop-vault-agent-devs/secrets/vault-secrets.properties" mvn spring-boot:run
 ```
 
 When the application starts you will see both beans initialise with Vault-issued credentials:

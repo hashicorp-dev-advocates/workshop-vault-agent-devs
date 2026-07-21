@@ -49,18 +49,19 @@ K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up vault-agent
 You should see Vault Agent render the secrets file and log something like:
 
 ```shell,nocopy
-vault-agent  | 2025-01-09T14:00:01.000Z [INFO] (runner) rendered "(dynamic)" -> "/secrets/vault-secrets.properties"
+agent: (runner) rendered "/spring/vault/secrets.ctmpl" => "/secrets/vault-secrets.properties"
+agent: (runner) executing command "[\"wget -q --header='Content-Type: application/json' --post-data='{}' http://payments-app:8080/actuator/refresh -O /dev/null || true\"]" from "/spring/vault/secrets.ctmpl" => "/secrets/vault-secrets.properties"
 ```
 
 Run the application
 ===
 
-In the **API Request** tab, start the Spring Boot application with Maven.
+In the **Maven** tab, start the Spring Boot application with Maven.
 The application imports the rendered secrets file on startup.
 
 ```shell
 cd /root/workshop-vault-agent-devs/spring/payments-app
-mvn spring-boot:run
+SPRING_CONFIG_IMPORT="file:/root/workshop-vault-agent-devs/secrets/vault-secrets.properties" mvn spring-boot:run
 ```
 
 When the application starts you will see it load the static secret:
