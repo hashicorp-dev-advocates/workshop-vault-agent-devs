@@ -13,7 +13,7 @@ tabs:
   title: Terminal
   type: terminal
   hostname: sandbox
-- id: hbinlrbtmwqg
+- id: ifvbtdxv3msl
   title: Maven
   type: terminal
   hostname: sandbox
