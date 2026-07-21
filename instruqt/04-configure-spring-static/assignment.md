@@ -49,7 +49,7 @@ Remove the hardcoded credentials and import the Vault Agent file
 2. Add `spring.config.import` to tell Spring Boot where to find the secrets file rendered by Vault Agent.
 
 ```properties
-spring.config.import=file:/vault/secrets/vault-secrets.properties
+spring.config.import=${SPRING_CONFIG_IMPORT:file:/vault/secrets/vault-secrets.properties}
 ```
 
 > [!NOTE]
@@ -76,9 +76,9 @@ exposed, the live-reload command in `agent.hcl` will fail silently.
 ```properties
 spring.application.name=payments-app
 
-spring.datasource.url=jdbc:postgresql://postgres:5432/payments
+spring.datasource.url=jdbc:postgresql://${DATABASE_HOST:localhost}:5432/payments
 
-spring.config.import=file:/vault/secrets/vault-secrets.properties
+spring.config.import=${SPRING_CONFIG_IMPORT:file:/vault/secrets/vault-secrets.properties}
 
 management.endpoints.web.exposure.include=refresh,health
 ```

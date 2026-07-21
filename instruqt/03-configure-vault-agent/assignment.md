@@ -118,7 +118,7 @@ Open `spring/vault/secrets.ctmpl` in the **Code** tab.
 The template already reads static credentials from the KV v2 engine.
 Review the syntax — `.Data.data` is required because KV v2 wraps values under a nested `data` key.
 
-```hcl
+```hcl,nocopy
 {{ with secret "spring/kv/data/payments-app" -}}
 custom.static-secret.username={{ index .Data.data "custom.static-secret.username" }}
 custom.static-secret.password={{ index .Data.data "custom.static-secret.password" }}
