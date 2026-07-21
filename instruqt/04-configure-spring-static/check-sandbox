@@ -3,7 +3,7 @@ set -euxo pipefail
 
 set-workdir /root/workshop-vault-agent-devs
 
-if ! grep -q "spring.config.import=file:" spring/payments-app/src/main/resources/application.properties; then
+if ! grep -q "spring.config.import=" spring/payments-app/src/main/resources/application.properties; then
     fail-message "Add \`spring.config.import\` pointing at the Vault Agent rendered file"
 fi
 

@@ -46,7 +46,7 @@ In the **Terminal** tab, start Vault Agent directly using the vault CLI.
 
 ```shell
 cd /root/workshop-vault-agent-devs
-VAULT_ADDR=http://127.0.0.1:8200 vault agent -config=spring/vault/agent.hcl
+vault agent -config=spring/vault/agent.hcl
 ```
 
 You should see Vault Agent authenticate, request database credentials from the `writer` role,

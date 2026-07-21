@@ -16,7 +16,7 @@ vault {
 auto_auth {
   method "token_file" {
     config {
-      path = "secrets/vault-token"
+      token_file_path = "secrets/vault-token"
     }
   }
 }

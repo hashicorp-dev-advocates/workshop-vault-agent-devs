@@ -48,7 +48,7 @@ Vault Agent will authenticate, render the secrets file, and then watch for chang
 
 ```shell
 cd /root/workshop-vault-agent-devs
-VAULT_ADDR=http://127.0.0.1:8200 vault agent -config=spring/vault/agent.hcl
+vault agent -config=spring/vault/agent.hcl
 ```
 
 You should see Vault Agent render the secrets file and log something like:
