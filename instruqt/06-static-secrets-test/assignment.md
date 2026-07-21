@@ -13,6 +13,11 @@ tabs:
   title: Terminal
   type: terminal
   hostname: sandbox
+- id: hbinlrbtmwqg
+  title: Maven
+  type: terminal
+  hostname: sandbox
+  workdir: /root/workshop-vault-agent-devs/spring/payments-app
 - id: gtyglrrrdgno
   title: API Request
   type: terminal
