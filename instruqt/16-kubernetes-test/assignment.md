@@ -69,14 +69,20 @@ kubectl logs -l app=payments-app -c payments-app
 ```
 
 ```shell,nocopy
-rebuild DataSource with username: v-kubernet-writer-AbCdEfGh-1736557753
 rebuild ExampleClient with static-secret username: nic
+rebuild database secrets: v-kubernet-writer-wQqko4Z8IE43Tmpk2SIp-1784664369,MsuLgSKMLZd-8Y02qz6r
 ```
 
 Test the application
 ===
 
-The Service is exposed as a NodePort on port 30080. Make requests in the **API Request** tab.
+In the **Terminal** tab, forward the application's service port to the host.
+
+```shell
+kubectl port-forward svc/payments-app 30080:8080
+```
+
+In the **API Request** tab, list the payments.
 
 List payments:
 
@@ -88,28 +94,37 @@ curl localhost:30080/payments
 [{"id":1,"reference":"REF001","amount":100.00,"currency":"USD","status":"PENDING","created_at":"..."}]
 ```
 
-Create a payment:
-
-```shell
-curl -s localhost:30080/payments \
-  -H "content-type: application/json" \
-  -d '{"reference":"REF-K8S","amount":99.00,"currency":"USD","status":"PENDING"}'
-```
-
 Verify credential rotation
 ===
 
 Wait about one minute and watch the sidecar container logs for a re-render:
 
 ```shell
-kubectl logs -l app=payments-app -c vault-agent -f
+kubectl logs -l app=payments-app -c vault-agent
 ```
 
 After the `writer` role TTL expires, the sidecar re-renders the credentials file and calls
-`/actuator/refresh`. The application log will show:
+`/actuator/refresh`.
+
+Check the application logs.
+
+```shell
+kubectl logs -l app=payments-app -c payments-app
+```
+
+The application log will show the previous data source shutting down and a new data source with updated credentials.
 
 ```shell,nocopy
-rebuild DataSource with username: v-kubernet-writer-XyZaBcDe-1736557854
+HikariPool-4 - Starting...
+HikariPool-4 - Added connection org.postgresql.jdbc.PgConnection@7d759607
+HikariPool-4 - Start completed.
+HikariPool-4 - Shutdown initiated...
+HikariPool-4 - Shutdown completed.
+Refreshed keys : [spring.datasource.username, spring.datasource.password]
+rebuild database secrets: v-kubernet-writer-vjQbVdoPY5lexxdCCIwC-1784664654,KIfIYeCLS3L1-XoSE7Ja
+HikariPool-5 - Starting...
+HikariPool-5 - Added connection org.postgresql.jdbc.PgConnection@2e6b3710
+HikariPool-5 - Start completed.
 ```
 
 Make a second request to confirm the application is still serving traffic.
