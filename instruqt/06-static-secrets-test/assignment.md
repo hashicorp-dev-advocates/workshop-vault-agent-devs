@@ -43,19 +43,19 @@ Your application will do the following when it runs:
 Start Vault Agent
 ===
 
-In the **Terminal** tab, start Vault Agent using Docker Compose.
+In the **Terminal** tab, start Vault Agent directly using the vault CLI.
 Vault Agent will authenticate, render the secrets file, and then watch for changes.
 
 ```shell
 cd /root/workshop-vault-agent-devs
-K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up vault-agent
+VAULT_ADDR=http://127.0.0.1:8200 vault agent -config=spring/vault/agent.hcl
 ```
 
 You should see Vault Agent render the secrets file and log something like:
 
 ```shell,nocopy
-agent: (runner) rendered "/spring/vault/secrets.ctmpl" => "/secrets/vault-secrets.properties"
-agent: (runner) executing command "[\"wget -q --header='Content-Type: application/json' --post-data='{}' http://payments-app:8080/actuator/refresh -O /dev/null || true\"]" from "/spring/vault/secrets.ctmpl" => "/secrets/vault-secrets.properties"
+agent: (runner) rendered "/root/workshop-vault-agent-devs/spring/vault/secrets.ctmpl" => "/root/workshop-vault-agent-devs/secrets/vault-secrets.properties"
+agent: (runner) executing command "[\"wget -q --header='Content-Type: application/json' --post-data='{}' http://localhost:8080/actuator/refresh -O /dev/null || true\"]" from "/root/workshop-vault-agent-devs/spring/vault/secrets.ctmpl" => "/root/workshop-vault-agent-devs/secrets/vault-secrets.properties"
 ```
 
 Run the application

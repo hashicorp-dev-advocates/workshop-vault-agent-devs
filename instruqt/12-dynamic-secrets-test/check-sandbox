@@ -6,7 +6,7 @@ set -euxo pipefail
 SECRETS_FILE="/root/workshop-vault-agent-devs/secrets/vault-secrets.properties"
 
 if [ ! -f "$SECRETS_FILE" ]; then
-    fail-message "Vault Agent has not yet rendered \`secrets/vault-secrets.properties\`. Start Vault Agent with \`docker compose up vault-agent\`."
+    fail-message "Vault Agent has not yet rendered \`secrets/vault-secrets.properties\`. Start Vault Agent with \`VAULT_ADDR=http://127.0.0.1:8200 vault agent -config=spring/vault/agent.hcl\`."
 fi
 
 if ! grep -q "^spring.datasource.username=" "$SECRETS_FILE"; then

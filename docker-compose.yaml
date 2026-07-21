@@ -1,24 +1,26 @@
 # =============================================================================
 # docker-compose.yml
 #
-# Full tutorial stack. Runs two variants simultaneously:
+# Infrastructure stack for the Vault Agent workshop:
 #
-#   Docker Compose variant:
-#     postgres → vault → vault-init → vault-agent → payments-app
+#   vault      — Vault dev server (port 8200 → 127.0.0.1:8200)
+#   database   — PostgreSQL (port 5432 → 127.0.0.1:5432)
+#   vault-init — one-shot: writes policy + agent token to secrets/
+#   server     — k3s server node (Kubernetes section)
+#   agent      — k3s agent node  (Kubernetes section)
 #
-#   Kubernetes variant (k3s):
-#     k3s server + agent share the same vpcbr network as Vault and Postgres.
-#     Run `bash vault/setup-k8s.sh` after `podman compose up -d` to install
-#     the Vault Agent Injector and deploy the app into k3s.
+# Vault Agent and the Spring Boot app run on the host — not in compose:
+#   vault agent -config=spring/vault/agent.hcl
+#   mvn spring-boot:run  (in spring/payments-app/)
 #
-# All services are on the vpcbr bridge (10.5.0.0/16) with fixed IPs so that
-# the Vault address (http://10.5.0.2:8200) is stable and can be hardcoded in
-# the Helm chart and Kubernetes deployment annotations.
+# All services share the vpcbr bridge (10.5.0.0/16) with fixed IPs so that
+# the Vault address (http://10.5.0.2:8200) is stable for k3s pods and the
+# Helm chart.
 #
 # Usage:
 #   mkdir -p tmp secrets
 #   chmod 777 secrets/
-#   podman compose up -d
+#   podman compose up -d vault database vault-init
 #
 # Reset:
 #   podman compose down -v
@@ -107,67 +109,6 @@ services:
         condition: service_healthy
 
   # ---------------------------------------------------------------------------
-  # vault-agent
-  # Runs Vault Agent in daemon mode. Renders secrets.ctmpl to
-  # /secrets/vault-secrets.properties and calls /actuator/refresh after each
-  # re-render. Depends on Vault and Postgres health so it can start on older
-  # docker-compose versions that do not support service_completed_successfully.
-  # ---------------------------------------------------------------------------
-  vault-agent:
-    image: hashicorp/vault:1.21.4
-    environment:
-      VAULT_ADDR: "http://10.5.0.2:8200"
-    volumes:
-      - ./spring/vault:/spring/vault:ro
-      - ./secrets:/secrets
-      - vault-agent-data:/vault
-    entrypoint:
-      - sh
-      - -ec
-      - |
-        until [ -f /secrets/vault-token ]; do
-          sleep 1
-        done
-        exec vault agent -config=/spring/vault/agent.hcl
-    networks:
-      vpcbr:
-        ipv4_address: 10.5.0.7
-    depends_on:
-      vault:
-        condition: service_healthy
-      database:
-        condition: service_healthy
-      vault-init:
-        condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /secrets/vault-secrets.properties"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  # ---------------------------------------------------------------------------
-  # payments-app (Docker Compose variant)
-  # Spring Boot app reading secrets from the file rendered by vault-agent.
-  # ---------------------------------------------------------------------------
-  payments-app:
-    build:
-      context: ./spring/payments-app
-      dockerfile: Dockerfile
-    environment:
-      SPRING_CONFIG_IMPORT: "file:/vault/secrets/vault-secrets.properties"
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://10.5.0.3:5432/payments"
-    volumes:
-      - ./secrets:/vault/secrets:ro
-    ports:
-      - "8080:8080"
-    networks:
-      vpcbr:
-        ipv4_address: 10.5.0.8
-    depends_on:
-      vault-agent:
-        condition: service_healthy
-
-  # ---------------------------------------------------------------------------
   # server (k3s)
   # k3s server node. Writes kubeconfig to ./tmp/kubeconfig.yaml so that
   # vault/setup-k8s.sh can use it on the host. Shares vpcbr so pods inside
@@ -227,7 +168,6 @@ services:
 volumes:
   postgres-data: {}
   vault-data: {}
-  vault-agent-data: {}
   k3s-server: {}
   k3s-agent: {}
 

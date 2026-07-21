@@ -7,17 +7,16 @@
 
 # ---------------------------------------------------------------------------
 # Vault server connection
-# "vault" is the Docker Compose service name resolved via Docker's internal DNS.
+# Vault publishes port 8200 to 127.0.0.1 on the host.
 # ---------------------------------------------------------------------------
 vault {
-  address = "http://vault:8200"
+  address = "http://127.0.0.1:8200"
 }
 
 auto_auth {
   method "token_file" {
     config {
-      # Vault 2.x renamed this key from "path" to "token_file_path".
-      token_file_path = "/secrets/vault-token"
+      path = "secrets/vault-token"
     }
   }
 }

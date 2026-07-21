@@ -29,7 +29,7 @@ tar -xvf helm-v${HELM_VERSION}-linux-amd64.tar.gz
 sudo mv linux-amd64/helm /usr/local/bin/helm
 rm -rf linux-amd64 helm-v${HELM_VERSION}-linux-amd64.tar.gz
 
-# install vault CLI
+# install vault CLI (includes the vault agent binary)
 curl -LO https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip
 unzip vault_${VAULT_VERSION}_linux_amd64.zip
 chmod +x ./vault
@@ -56,7 +56,7 @@ git clone https://github.com/hashicorp-dev-advocates/workshop-vault-agent-devs.g
 
 cd /root/workshop-vault-agent-devs
 
-# create runtime directories that docker compose and vault-agent expect
+# create runtime directories that vault-agent and the app expect
 mkdir -p secrets tmp
 chmod 777 secrets/
 
@@ -64,15 +64,15 @@ chmod 777 secrets/
 uuidgen > ./tmp/k3s.token
 
 # start infrastructure services only:
-#   vault        — Vault dev server
-#   database     — PostgreSQL
-#   vault-init   — one-shot Vault configuration
+#   vault        — Vault dev server (port 8200 published to 127.0.0.1:8200)
+#   database     — PostgreSQL (port 5432 published to 127.0.0.1:5432)
+#   vault-init   — one-shot Vault configuration (policy + agent token)
 #   server       — k3s server node
 #   agent        — k3s agent node
 #
-# vault-agent and payments-app are intentionally excluded:
-#   vault-agent  — participants start this manually in a Terminal tab
-#   payments-app — participants run this locally via ./mvnw spring-boot:run
+# vault-agent is intentionally excluded: participants run it natively with
+#   vault agent -config=spring/vault/agent.hcl
+# payments-app is also excluded: participants run it via mvn spring-boot:run
 K3S_TOKEN=$(cat ./tmp/k3s.token) docker-compose up -d vault database vault-init server agent
 
 # add the HashiCorp Helm chart repo for the Kubernetes section

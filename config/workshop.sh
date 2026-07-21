@@ -88,10 +88,10 @@ cat > "${REPO_ROOT}/spring/vault/agent.hcl" << 'EOF'
 
 # ---------------------------------------------------------------------------
 # Vault server connection
-# "vault" is the Docker Compose service name resolved via Docker's internal DNS.
+# Vault publishes port 8200 to 127.0.0.1 on the host.
 # ---------------------------------------------------------------------------
 vault {
-  address = "http://vault:8200"
+  address = "http://127.0.0.1:8200"
 }
 
 template_config {
@@ -101,16 +101,15 @@ template_config {
 # ---------------------------------------------------------------------------
 # Auto-auth: token file method
 #
-# Vault Agent reads the token from /secrets/vault-token. This file is written
-# by vault-init before vault-agent starts (enforced by depends_on in
-# docker-compose.yml). The token is scoped to the payments-app policy and
-# cannot access any other Vault paths.
+# Vault Agent reads the token from secrets/vault-token (relative to the
+# working directory). This file is written by vault-init before vault agent
+# is started. The token is scoped to the payments-app policy and cannot
+# access any other Vault paths.
 # ---------------------------------------------------------------------------
 auto_auth {
   method "token_file" {
     config {
-      # Vault 2.x renamed this key from "path" to "token_file_path".
-      token_file_path = "/secrets/vault-token"
+      path = "secrets/vault-token"
     }
   }
 }
@@ -119,7 +118,7 @@ auto_auth {
 # Template: render vault-secrets.properties from Vault secrets
 #
 # source      : the Consul Template file that defines the output format
-# destination : written to the shared secrets bind-mount; Spring Boot reads
+# destination : written to the secrets/ directory; Spring Boot reads
 #               this file via spring.config.import
 # error_on_missing_key : agent exits with an error if a secret key referenced
 #               in the template does not exist — prevents silent partial renders
@@ -128,15 +127,14 @@ auto_auth {
 #               the latest credentials without a container restart
 # ---------------------------------------------------------------------------
 template {
-  source               = "/spring/vault/secrets.ctmpl"
-  destination          = "/secrets/vault-secrets.properties"
+  source               = "spring/vault/secrets.ctmpl"
+  destination          = "secrets/vault-secrets.properties"
   error_on_missing_key = true
 
   # payments-app must be running before this succeeds. The || true means
   # Vault Agent does not abort on command failure — the file is already written.
-  # wget is used because curl is not available in the hashicorp/vault image.
   # /actuator/refresh requires Content-Type: application/json.
-  command = "wget -q --header='Content-Type: application/json' --post-data='{}' http://payments-app:8080/actuator/refresh -O /dev/null || true"
+  command = "wget -q --header='Content-Type: application/json' --post-data='{}' http://localhost:8080/actuator/refresh -O /dev/null || true"
 }
 EOF
 echo "    wrote spring/vault/agent.hcl"

@@ -63,25 +63,29 @@ where to write the rendered output, and what command to run after a successful r
 
 ```hcl
 template {
-  source               = "/spring/vault/secrets.ctmpl"
-  destination          = "/secrets/vault-secrets.properties"
+  source               = "spring/vault/secrets.ctmpl"
+  destination          = "secrets/vault-secrets.properties"
   error_on_missing_key = true
-  command = "wget -q --header='Content-Type: application/json' --post-data='{}' http://payments-app:8080/actuator/refresh -O /dev/null || true"
+  command = "wget -q --header='Content-Type: application/json' --post-data='{}' http://localhost:8080/actuator/refresh -O /dev/null || true"
 }
 ```
 
-- `source` — the Consul Template file Vault Agent will render
-- `destination` — the output file Spring Boot will import
+- `source` — the Consul Template file Vault Agent will render (relative to the working directory)
+- `destination` — the output file Spring Boot will import (relative to the working directory)
 - `error_on_missing_key` — fails loudly if a secret key is missing, preventing silent partial renders
 - `command` — called after every successful render; triggers Spring Boot's `/actuator/refresh`
   so `@RefreshScope` beans are re-bound with fresh credentials without a container restart
+
+> [!NOTE]
+> Run `vault agent` from the repository root (`/root/workshop-vault-agent-devs`) so that the
+> relative paths in `source` and `destination` resolve correctly.
 
 <details>
 <summary><b>Solution</b></summary>
 
 ```hcl
 vault {
-  address = "http://vault:8200"
+  address = "http://127.0.0.1:8200"
 }
 
 template_config {
@@ -91,16 +95,16 @@ template_config {
 auto_auth {
   method "token_file" {
     config {
-      token_file_path = "/secrets/vault-token"
+      path = "secrets/vault-token"
     }
   }
 }
 
 template {
-  source               = "/spring/vault/secrets.ctmpl"
-  destination          = "/secrets/vault-secrets.properties"
+  source               = "spring/vault/secrets.ctmpl"
+  destination          = "secrets/vault-secrets.properties"
   error_on_missing_key = true
-  command = "wget -q --header='Content-Type: application/json' --post-data='{}' http://payments-app:8080/actuator/refresh -O /dev/null || true"
+  command = "wget -q --header='Content-Type: application/json' --post-data='{}' http://localhost:8080/actuator/refresh -O /dev/null || true"
 }
 ```
 </details>

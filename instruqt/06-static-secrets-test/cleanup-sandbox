@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euxo pipefail
 
-# Stop vault-agent and the Spring Boot application before the next challenge
-cd /root/workshop-vault-agent-devs
-docker compose stop vault-agent
+# Stop Vault Agent and the Spring Boot application before the next challenge
+pkill -f "vault agent" || true
 pkill -f "spring-boot:run" || true

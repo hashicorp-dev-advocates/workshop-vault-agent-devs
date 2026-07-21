@@ -3,9 +3,10 @@
 ## Repository purpose
 
 Demonstrates how to use **HashiCorp Vault Agent** to inject and live-reload secrets into a
-Spring Boot application without the Vault SDK. Both variants run from a single
-`docker-compose.yaml`: the Docker Compose variant uses a standalone Vault Agent, and the
-Kubernetes variant deploys the app into an in-compose k3s cluster with the Vault Agent Injector.
+Spring Boot application without the Vault SDK. The infrastructure (Vault, PostgreSQL, k3s)
+runs via `docker-compose.yaml`. Vault Agent itself runs natively on the host using the
+`vault agent` CLI — no container required. The Kubernetes variant deploys the app into the
+in-compose k3s cluster with the Vault Agent Injector.
 
 ## Key directories
 
@@ -26,18 +27,16 @@ For local work, use `podman compose`. Instruqt runs the same file with an older
 `docker-compose`, so service dependencies must stay compatible with
 `service_started` and `service_healthy` conditions only.
 
-`vault-agent` is compatible with older `docker-compose` implementations that only accept
-`depends_on` conditions `service_started` and `service_healthy`: it waits for
-`secrets/vault-token` in its entrypoint instead of relying on
-`service_completed_successfully` from `vault-init`.
+The `vault-agent` and `payments-app` compose services exist for local full-stack testing
+only and are **not started** on Instruqt. On Instruqt:
+- Vault Agent runs natively via `vault agent -config=spring/vault/agent.hcl`
+- The Spring Boot app runs via `mvn spring-boot:run`
 
 | Service | Fixed IP | Role |
 |---------|----------|------|
-| `vault` | 10.5.0.2 | HashiCorp Vault 1.21.4, dev mode, token `root-token` |
-| `database` | 10.5.0.3 | PostgreSQL 16, database `payments` |
-| `vault-init` | 10.5.0.6 | One-shot: runs `vault/setup.sh` to apply the policy and create the agent token (secrets engines are configured by workshop participants) |
-| `vault-agent` | 10.5.0.7 | Renders `vault-secrets.properties`; calls `/actuator/refresh` on change |
-| `payments-app` | 10.5.0.8 | Spring Boot app (Docker Compose variant), port 8080 |
+| `vault` | 10.5.0.2 | HashiCorp Vault 1.21.4, dev mode, token `root-token`; port 8200 → 127.0.0.1:8200 |
+| `database` | 10.5.0.3 | PostgreSQL 16, database `payments`; port 5432 → 127.0.0.1:5432 |
+| `vault-init` | 10.5.0.6 | One-shot: runs `vault/setup.sh` to apply the policy and create the agent token |
 | `server` | 10.5.0.4 | k3s server node; writes kubeconfig to `./tmp/kubeconfig.yaml` |
 | `agent` | 10.5.0.5 | k3s agent node |
 
@@ -100,6 +99,7 @@ Builds and publishes `ghcr.io/<owner>/payments-app-spring` to GitHub Container R
 
 - Local testing runtime: **Podman**. Use `podman compose` and `podman build` for local development and validation.
 - Instruqt uses an older `docker-compose`; keep [`docker-compose.yaml`](docker-compose.yaml) compatible with compose features limited to `service_started` and `service_healthy` dependency conditions.
+- On Instruqt, Vault Agent runs natively with `vault agent -config=spring/vault/agent.hcl` (not via docker-compose). Paths in `agent.hcl` are relative to the repository root.
 - Tests skip during image build (`-DskipTests`) because they require a live database and
   secrets file.
 - Secrets are never hardcoded. All credentials come from Vault Agent at runtime.

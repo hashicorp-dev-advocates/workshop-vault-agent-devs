@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Verify the rendered secrets file contains a dynamic datasource username
+# (written by Vault Agent from the database/creds/writer path)
+SECRETS_FILE="/root/workshop-vault-agent-devs/secrets/vault-secrets.properties"
+
+if [ ! -f "$SECRETS_FILE" ]; then
+    fail-message "Vault Agent has not yet rendered \`secrets/vault-secrets.properties\`. Start Vault Agent with \`vault agent -config=spring/vault/agent.hcl\`."
+fi
