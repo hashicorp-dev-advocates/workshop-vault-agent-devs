@@ -62,32 +62,34 @@ cd /root/workshop-vault-agent-devs/spring/payments-app
 SPRING_CONFIG_IMPORT="file:/root/workshop-vault-agent-devs/secrets/vault-secrets.properties" mvn spring-boot:run
 ```
 
-When the application starts you will see both beans initialise with Vault-issued credentials:
+When the application starts you will see both beans initialize with Vault-issued credentials:
 
 ```shell,nocopy
-rebuild DataSource with username: v-token-writer-AbCdEfGh-1736449174
+rebuild database secrets: v-token-pa-writer-mgt7yCDuG5IEmmqwLEwW-1784663884,-keoae6IfwKHLHQ2fzgw
 rebuild ExampleClient with static-secret username: nic
 ```
 
 Test the application
 ===
 
-In the **API Request** tab, make a request to list payments.
-
-```shell
-curl localhost:8080/payments
-```
-
-```shell,nocopy
-[{"id":1,"reference":"REF001","amount":100.00,"currency":"USD","status":"PENDING","created_at":"..."}]
-```
-
-Make a request to create a new payment.
+In the **API Request** tab, make a request to create a new payment.
 
 ```shell
 curl -s localhost:8080/payments \
   -H "content-type: application/json" \
   -d '{"reference":"REF999","amount":42.00,"currency":"USD","status":"PENDING"}'
+```
+
+List the payments.
+
+```shell
+curl localhost:8080/payments
+```
+
+It should return the previously created payment.
+
+```shell,nocopy
+[{"id":1,"reference":"REF001","amount":100.00,"currency":"USD","status":"PENDING","created_at":"..."}]
 ```
 
 Observe credential rotation
@@ -103,7 +105,14 @@ vault-agent  | [INFO] (runner) rendered "(dynamic)" -> "/secrets/vault-secrets.p
 The application log will show the `DataSource` being rebuilt:
 
 ```shell,nocopy
-rebuild DataSource with username: v-token-writer-XyZaBcDe-1736449274
+HikariPool-1 - Starting...
+HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@7e053201
+HikariPool-1 - Start completed.
+HikariPool-1 - Shutdown initiated...
+HikariPool-1 - Shutdown completed.
+Refreshed keys : [spring.datasource.username, spring.datasource.password]
+rebuild database secrets: v-token-pa-writer-Yxij3FDse9iC4PPpSvD2-1784663994,CEfXwG-ol4IdLObeG3Yy
+HikariPool-2 - Starting...
 ```
 
 Make a second request in the **API Request** tab to confirm the application keeps serving
