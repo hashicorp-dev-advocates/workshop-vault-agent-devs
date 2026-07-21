@@ -6,8 +6,8 @@ title: Dynamic Secrets - Test application with Vault Agent
 teaser: Start the full stack and observe automatic credential rotation without a restart.
 notes:
 - type: text
-  contents: |-
-    For more resources on using Vault Agent to inject secrets into applications, check out [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
+  contents: For more resources on using Vault Agent to inject secrets into applications,
+    check out [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
 tabs:
 - id: xfd9dizuscit
   title: Terminal

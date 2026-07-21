@@ -6,8 +6,8 @@ title: Static Secrets - Test application with Vault Agent
 teaser: Start Vault Agent and the application, then test live secret reload.
 notes:
 - type: text
-  contents: |-
-    For more resources on using Vault Agent to inject secrets into applications, check out the [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
+  contents: For more resources on using Vault Agent to inject secrets into applications,
+    check out the [Vault Agent documentation](https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent).
 tabs:
 - id: tmnosluxyr8b
   title: Terminal
