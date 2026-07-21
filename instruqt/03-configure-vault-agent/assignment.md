@@ -105,6 +105,11 @@ template {
 ```
 </details>
 
+> [!NOTE]
+> The command in the template can use any command to restart the application, such as a systemd command or
+> kill and restarting the process. Note that your application must include some graceful shutdown handling
+> of any connections.
+
 Write the Consul Template for static secrets
 ===
 
